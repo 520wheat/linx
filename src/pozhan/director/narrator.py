@@ -61,14 +61,24 @@ def read_card(case: Case, card_id: int) -> str:
     return f"{cn(card.id)}号卡，{card.title}：{card.text}" if card else ""
 
 
-def broke(case: Case, state: Interrogation, claim_id: int) -> str:
+# 出示后旁白先宣布判定、嫌疑人再反应：判定是模板，玩家几乎立刻就能听到结果（#22）
+
+
+def broke(claim_id: int) -> str:
+    return f"证词{cn(claim_id)}被戳破了！"
+
+
+def still_holding(case: Case, state: Interrogation) -> str:
     left = [c for c in case.claims if c.lie and c.id not in state.broken]
-    tail = f"他还在坚持{'、'.join(f'证词{cn(c.id)}' for c in left)}。" if left else ""
-    return f"证词{cn(claim_id)}被戳破了，{case.suspect.name}的语气变了。{tail}"
+    return f"他还在坚持{'、'.join(f'证词{cn(c.id)}' for c in left)}。" if left else ""
 
 
-def wrong(case: Case, claim_id: int, strikes_left: int) -> str:
-    return f"这张卡驳不倒证词{cn(claim_id)}。律师还有{cn(strikes_left)}次就到。"
+def wrong(claim_id: int) -> str:
+    return f"这张卡驳不倒证词{cn(claim_id)}。"
+
+
+def countdown(strikes_left: int) -> str:
+    return f"律师还有{cn(strikes_left)}次就到。"
 
 
 def already_broken(claim_id: int) -> str:

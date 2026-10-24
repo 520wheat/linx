@@ -24,14 +24,23 @@ class LLM(Protocol):
 class OpenAICompatLLM:
     """调用任意 OpenAI 兼容的 /chat/completions。"""
 
-    def __init__(self, base_url: str, api_key: str, *, temperature: float = 0.0) -> None:
+    def __init__(
+        self, base_url: str, api_key: str, *, temperature: float = 0.0, extra_body: dict | None = None
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.temperature = temperature
+        self.extra_body = extra_body or {}  # 例如关闭思考：{"thinking": {"type": "disabled"}}
         self._client = httpx.AsyncClient(headers={"Authorization": f"Bearer {api_key}"})
 
     def _body(self, model: str, messages: list[Message], stream: bool) -> dict:
-        return {"model": model, "messages": messages, "temperature": self.temperature, "stream": stream}
+        return {
+            **self.extra_body,
+            "model": model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "stream": stream,
+        }
 
     async def complete(self, model: str, messages: list[Message], *, timeout: float = 10.0) -> str:
         try:

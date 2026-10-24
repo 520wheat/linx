@@ -82,19 +82,22 @@ class Director:
                 async for line in self._suspect(case, state, task_answer(q, slip), history):
                     yield line
             case Broke(contradiction=x):
+                yield say(narrator.broke(x.claim))
                 async for line in self._suspect(case, state, task_broke(case, x), history):
                     yield line
-                yield say(narrator.broke(case, state, x.claim))
+                yield say(narrator.still_holding(case, state))
             case Confession(contradiction=x):
+                yield say(narrator.broke(x.claim))
                 async for line in self._suspect(
                     case, state, task_confess(case, x), history, may_confess=True
                 ):
                     yield line
                 yield say(narrator.confession_wrap(case))
             case Wrong(card=card, claim=claim, strikes_left=left):
+                yield say(narrator.wrong(claim))
                 async for line in self._suspect(case, state, task_wrong(case, card, claim), history):
                     yield line
-                yield say(narrator.wrong(case, claim, left))
+                yield say(narrator.countdown(left))
             case AlreadyBroken(claim=claim):
                 yield say(narrator.already_broken(claim))
             case UnknownRef(card=card, claim=claim):

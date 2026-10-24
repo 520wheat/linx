@@ -10,7 +10,10 @@ _OUT_OF_CHARACTER = re.compile(
     r"AI|人工智能|语言模型|大模型|提示词|系统设定|作为一个|我是一个程序|游戏规则|扮演", re.I
 )
 _STRIP = re.compile(r"[（(][^）)]*[）)]|\*+|#+|[\U0001F000-\U0001FFFF☀-➿]")
-SENTENCE_END = "。！？!?"  # 不在省略号处断句：「是我……拿的」要作为一句整体检查
+SENTENCE_END = "。！？!?"
+# 流式输出时在逗号处也先放出一段，尽早开始 TTS（#22）；守卫按已说出的全部内容、去掉标点后检查
+CLAUSE_END = SENTENCE_END + "，,；;"
+_PUNCT = re.compile(r"[\s，,。.！!？?；;：:、…—\-~“”\"'‘’]")
 
 MAX_CHARS = 90
 
@@ -21,21 +24,22 @@ def clean(text: str) -> str:
 
 
 def violation(sentence: str, *, may_confess: bool) -> str | None:
-    """返回违规原因；没问题返回 None。"""
-    if not may_confess and _CONFESS.search(sentence):
+    """返回违规原因；没问题返回 None。去掉标点再匹配：「是我，拿的」也算认罪。"""
+    plain = _PUNCT.sub("", sentence)
+    if not may_confess and _CONFESS.search(plain):
         return "premature-confession"
-    if _OUT_OF_CHARACTER.search(sentence):
+    if _OUT_OF_CHARACTER.search(plain):
         return "out-of-character"
     return None
 
 
-def split_sentences(buffer: str) -> tuple[list[str], str]:
-    """把缓冲区切成完整句子和剩余部分。"""
+def split_sentences(buffer: str, ends: str = SENTENCE_END) -> tuple[list[str], str]:
+    """把缓冲区切成完整的句子（或分句）和剩余部分。"""
     sentences, start, i = [], 0, 0
     while i < len(buffer):
-        if buffer[i] in SENTENCE_END:
+        if buffer[i] in ends:
             j = i + 1
-            while j < len(buffer) and buffer[j] in SENTENCE_END + "”\"'":
+            while j < len(buffer) and buffer[j] in ends + "”\"'":
                 j += 1
             sentences.append(buffer[start:j])
             start = i = j
