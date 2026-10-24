@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator, Callable
 from pozhan.case.model import Case
 from pozhan.director.director import Director
 from pozhan.engine.events import Command, CommandKind
+from pozhan.engine.outcomes import Repeat
 from pozhan.engine.rules import apply, new_game
 from pozhan.intent.interpreter import Clarify, Interpreter
 from pozhan.llm.client import Message
@@ -42,6 +43,11 @@ class Game:
             outcome = event
         else:
             session.state, outcome = apply(self.case, session.state, event, now)
+
+        if isinstance(outcome, Repeat) and session.last_reply:
+            self.store.put(session)
+            yield session.last_reply
+            return
 
         reply = [self.director.emoji(self.case, session.state)]
         yield reply[0]
