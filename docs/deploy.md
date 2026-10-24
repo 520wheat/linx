@@ -1,0 +1,115 @@
+# 上线指南
+
+把《破绽》部署成一个公网可访问的服务，再让灵矽智能体把它当作「大模型」来调用。整体链路：
+
+```
+灵矽设备 ──语音──▶ 灵矽平台（ASR / TTS / 情绪音色）──OpenAI 兼容请求──▶ 破绽服务 ──▶ 大模型
+```
+
+## 1. 部署服务
+
+### Docker（推荐）
+
+```bash
+docker build -t pozhan .
+```
+
+```bash
+docker run -d --name pozhan -p 8000:8000 -v pozhan-data:/data -e POZHAN_API_KEY=换成一个足够长的随机串 -e LLM_BASE_URL=https://你的-openai-兼容地址/v1 -e LLM_API_KEY=你的大模型密钥 pozhan
+```
+
+```bash
+curl http://127.0.0.1:8000/healthz
+```
+
+返回 `{"ok":true,"case":"golden-watch"}` 就说明服务起来了。
+
+- **对局日志**：在卷 `/data/logs/games/<日期>/` 下，每局一个 JSONL 文件。
+- **换案件**：挂载案件文件，并设置 `POZHAN_CASE` 指向它。
+
+### 直接运行
+
+```bash
+uv sync --no-dev
+```
+
+```bash
+HOST=0.0.0.0 PORT=8000 POZHAN_API_KEY=... LLM_BASE_URL=... LLM_API_KEY=... uv run pozhan serve
+```
+
+## 2. 提供公网 HTTPS 地址
+
+灵矽平台在公网上，必须能通过 HTTPS 访问到服务。
+
+- **正式上线**：放在有固定域名和证书的反向代理后面（Nginx、云厂商负载均衡等）。
+- **临时演示**：用 cloudflared 的临时隧道。如果本机有代理导致 QUIC 连不上，加 `--protocol http2`。
+
+```bash
+cloudflared tunnel --protocol http2 --url http://127.0.0.1:8000
+```
+
+隧道启动后会打印一个 `https://xxxx.trycloudflare.com` 地址，下面称为「服务地址」。
+
+## 3. 在灵矽智控台接入
+
+登录 [智控台](https://xrobo.qiniu.com)。
+
+### 3.1 添加自定义模型
+
+进入「LLM → 我的模型 → 新增模型」，按下表填写，然后保存：
+
+| 字段 | 填写 |
+|---|---|
+| 名称 | 随意，例如「破绽」 |
+| 接口类型 | OpenAI接口 |
+| API Base URL | `服务地址/v1`，例如 `https://xxxx.trycloudflare.com/v1` |
+| 系统推理模型 | `pozhan` |
+| API密钥 | 与服务端 `POZHAN_API_KEY` **相同的值**。⚠️ **不能留空**，留空时平台会在设备握手后立即断开连接 |
+
+### 3.2 配置智能体
+
+进入「智能体管理」，新建一个智能体，在「配置角色」里设置：
+
+| 配置项 | 建议值 | 原因 |
+|---|---|---|
+| 大语言模型 | 自定义模型 → 上一步添加的模型 | 由破绽服务接管对话 |
+| 角色音色 | 带「（多情感）」的音色，例如「爽快思思（多情感）」 | 嫌疑人的语气需要随心理档位变化 |
+| 多情绪变化 | 开启 | 让回复开头的 emoji 驱动音色情绪 |
+| 空闲超时（对话与视觉） | 600 秒以上 | 玩家讨论时可能很久不说话 |
+| 记忆 | 无记忆 | 对局状态和对话历史由服务端自己维护 |
+| 意图识别（技能与扩展） | 无意图识别，或统一意图识别 | 「分离意图识别」会额外调用一次模型，会被当成玩家的一句话 |
+| 角色介绍 | 随意 | 服务端不使用 |
+
+保存配置。按平台提示，**改完配置要重启设备才会生效**。
+
+### 3.3 绑定设备
+
+在该智能体的「设备管理 → 新增」里，输入设备播报的 6 位验证码。
+
+## 4. 验收
+
+- **真机**：对设备说「开始审讯」，应该听到案情、三条证词和规则。
+- **没有硬件**：用设备模拟器，在 macOS 上用合成语音跑一局：
+
+```bash
+uv run --group devsim python tools/devsim.py ota
+```
+
+第一次运行会打印激活码，到「设备管理 → 新增」填入，然后再运行一次 `ota`。
+
+```bash
+uv run --group devsim python tools/devsim.py play scripts/win.txt
+```
+
+模拟器会打印每轮的识别结果、回复和时延（从说完到首个音频）。
+
+## 常见问题
+
+| 现象 | 原因与处理 |
+|---|---|
+| 设备连上后立刻断开，服务端没有收到任何请求 | 「我的模型」的 API 密钥为空。填上与 `POZHAN_API_KEY` 相同的值 |
+| 服务端日志里出现 401 | 「我的模型」的 API 密钥与 `POZHAN_API_KEY` 不一致 |
+| 嫌疑人只会重复几句固定台词 | 服务端没有配置 `LLM_BASE_URL` / `LLM_API_KEY`，或者大模型调用失败。查服务日志里的 `suspect generation failed` |
+| 回复很慢 | 确认 `LLM_EXTRA_BODY` 关闭了思考（默认已关闭）；用 `evals/latency.py` 比较模型的首字延迟 |
+| 不确定平台发来的请求长什么样 | 设置 `POZHAN_LOG_REQUESTS=1`，原始请求会写到 `logs/requests.jsonl`（不含鉴权头） |
+| 多台设备会串局 | 平台请求里没有设备标识时，所有设备共用一局。设置 `POZHAN_LOG_REQUESTS=1` 后查看请求头，并在 Issue 里反馈 |
