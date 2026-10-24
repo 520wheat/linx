@@ -1,6 +1,7 @@
 import hmac
 import json
 import logging
+import re
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -27,6 +28,18 @@ def _last_user_text(messages: list[Message]) -> str:
                 return "".join(p.get("text", "") for p in content if isinstance(p, dict))
             return content
     return ""
+
+
+# 智能体开着「情绪识别」时，灵矽会在 ASR 结果末尾追加情绪标注，例如「开始审讯 [neutral的说]」（#33）
+_ASR_EMOTION = re.compile(r"\s*\[([A-Za-z_]+)的说\]\s*$")
+
+
+def split_emotion(text: str) -> tuple[str, str | None]:
+    """去掉灵矽追加的情绪标注，返回 (玩家原话, 识别出的情绪)。"""
+    m = _ASR_EMOTION.search(text)
+    if not m:
+        return text, None
+    return text[: m.start()], m.group(1)
 
 
 def _chunk(cid: str, delta: dict, finish: str | None = None) -> str:
@@ -102,14 +115,14 @@ def create_app(
         record(request, body)
         messages: list[Message] = body.get("messages") or []
         key = resolver.resolve(request.headers, body)
-        text = _last_user_text(messages)
+        text, voice_emotion = split_emotion(_last_user_text(messages))
         if len(text) > MAX_TEXT_CHARS:
             log.warning("user text truncated from %d chars for %s", len(text), key)
             text = text[:MAX_TEXT_CHARS]
         cid = "chatcmpl-" + uuid.uuid4().hex[:16]
 
         if not body.get("stream"):
-            reply = "".join([part async for part in game.turn(key, text)])
+            reply = "".join([part async for part in game.turn(key, text, voice_emotion=voice_emotion)])
             return JSONResponse(
                 {
                     "id": cid,
@@ -129,7 +142,7 @@ def create_app(
         async def events() -> AsyncIterator[str]:
             yield _chunk(cid, {"role": "assistant"})
             try:
-                async for part in game.turn(key, text):
+                async for part in game.turn(key, text, voice_emotion=voice_emotion):
                     yield _chunk(cid, {"content": part})
             except Exception:  # 出错也要把流正常收尾，避免设备卡住
                 log.exception("turn failed for %s", key)

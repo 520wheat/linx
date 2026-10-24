@@ -70,13 +70,13 @@ class Game:
         self.log = log or GameLog(None)
         self.clock = clock
 
-    async def turn(self, key: str, text: str) -> AsyncIterator[str]:
+    async def turn(self, key: str, text: str, *, voice_emotion: str | None = None) -> AsyncIterator[str]:
         """处理玩家的一句话，按增量产出要说的文本。第一段永远是本轮情绪 emoji。"""
         session = self.store.get_or_create(key)
         async with session.lock:  # 同一局的请求串行处理
             pending: list[_Speculation] = []
             try:
-                async for part in self._play(session, key, text, pending):
+                async for part in self._play(session, key, text, pending, voice_emotion):
                     yield part
             finally:
                 # 玩家打断时平台会断开流，这里把还在跑的投机生成一并取消，不留后台任务（#24）
@@ -84,7 +84,12 @@ class Game:
                     spec.task.cancel()
 
     async def _play(
-        self, session: Session, key: str, text: str, pending: list["_Speculation"]
+        self,
+        session: Session,
+        key: str,
+        text: str,
+        pending: list["_Speculation"],
+        voice_emotion: str | None = None,
     ) -> AsyncIterator[str]:
         t0 = time.monotonic()
         now = self.clock()
@@ -148,6 +153,7 @@ class Game:
             key,
             session.game_id,
             text=text,
+            voice_emotion=voice_emotion,
             event=event,
             outcome=outcome,
             reply=spoken,
