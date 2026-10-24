@@ -156,3 +156,24 @@ async def test_platform_tools_in_request_are_ignored(tmp_path):
     r = await http.post("/v1/chat/completions", json=body)
     message = r.json()["choices"][0]["message"]
     assert "tool_calls" not in message and "九点到十点" in message["content"]
+
+
+async def test_oversized_body_is_rejected(tmp_path):
+    app = make_app(tmp_path)
+    http = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+    big = {"model": "pozhan", "messages": [{"role": "user", "content": "啊" * 600_000}]}
+    assert (await http.post("/v1/chat/completions", json=big)).status_code == 413
+    assert (await http.post("/v1/chat/completions", content=b"[1,2]")).status_code == 400
+
+
+async def test_overlong_utterance_is_truncated(tmp_path):
+    c = Client(make_app(tmp_path))
+    await c.say("开始")
+    await c.say("你" * 5000)
+    records = [
+        json.loads(x)
+        for p in tmp_path.rglob("*.jsonl")
+        if p.name != "req.jsonl"
+        for x in p.read_text().splitlines()
+    ]
+    assert len(records[-1]["text"]) == 200
