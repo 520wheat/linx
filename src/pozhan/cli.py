@@ -6,6 +6,7 @@ from pathlib import Path
 
 import uvicorn
 
+from pozhan.cards import render as render_cards
 from pozhan.case import load_case, validate
 from pozhan.config import Settings
 from pozhan.director.director import Director
@@ -68,9 +69,15 @@ def main() -> None:
     serve.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     chk = sub.add_parser("check", help="校验案件文件")
     chk.add_argument("path")
+    cards = sub.add_parser("cards", help="生成可打印的线索卡（HTML，浏览器打开后打印）")
+    cards.add_argument("path", help="案件文件")
+    cards.add_argument("-o", "--out", default="cards.html")
     args = parser.parse_args()
 
     if args.cmd == "serve":
         uvicorn.run(build_app(), host=args.host, port=args.port)
     elif args.cmd == "check":
         sys.exit(check(args.path))
+    elif args.cmd == "cards":
+        Path(args.out).write_text(render_cards(load_case(args.path)), encoding="utf-8")
+        print(f"已生成 {args.out}：用浏览器打开后打印（A4，一页四张）")
