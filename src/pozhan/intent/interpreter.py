@@ -2,7 +2,8 @@ from dataclasses import dataclass
 
 from pozhan.case.model import Case
 from pozhan.engine.events import Ask, Event
-from pozhan.llm.client import LLM
+from pozhan.intent.classifier import LLMClassifier
+from pozhan.intent.rules import RuleMatcher
 
 
 @dataclass(frozen=True)
@@ -11,24 +12,6 @@ class Clarify:
 
     card: int | None
     claim: int | None
-
-
-class RuleMatcher:
-    """编号句式和指令的规则匹配。实现见 #8。"""
-
-    def match(self, text: str, case: Case) -> Event | Clarify | None:
-        return None
-
-
-class LLMClassifier:
-    """规则未命中时，用大模型判断是不是出示。实现见 #8。"""
-
-    def __init__(self, llm: LLM, model: str) -> None:
-        self.llm = llm
-        self.model = model
-
-    async def classify(self, text: str, case: Case) -> Event | Clarify:
-        return Ask(text)
 
 
 class Interpreter:
@@ -42,4 +25,7 @@ class Interpreter:
             return matched
         if self.classifier is None:
             return Ask(text)
-        return await self.classifier.classify(text, case)
+        result = await self.classifier.classify(text, case)
+        if isinstance(result, tuple):
+            return Clarify(*result)
+        return result
