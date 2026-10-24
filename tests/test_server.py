@@ -142,3 +142,17 @@ async def test_request_log_drops_authorization(tmp_path):
 )
 def test_session_key_resolution(headers, body, key):
     assert HeaderResolver().resolve(headers, body) == key
+
+
+async def test_platform_tools_in_request_are_ignored(tmp_path):
+    # 「统一意图识别」开启时，平台会在主对话请求里附带 tools；游戏照常处理，不返回工具调用
+    app = make_app(tmp_path)
+    http = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+    body = {
+        "model": "pozhan",
+        "messages": [{"role": "system", "content": "你是小智"}, {"role": "user", "content": "开始审讯"}],
+        "tools": [{"type": "function", "function": {"name": "get_weather", "parameters": {}}}],
+    }
+    r = await http.post("/v1/chat/completions", json=body)
+    message = r.json()["choices"][0]["message"]
+    assert "tool_calls" not in message and "九点到十点" in message["content"]

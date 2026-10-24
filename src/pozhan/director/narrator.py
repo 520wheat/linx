@@ -116,5 +116,9 @@ def quit_game(case: Case) -> str:
     return f"游戏结束。真相是：{case.reveal}{AGAIN}"
 
 
+def not_heard() -> str:
+    return "刚才没听清，能再说一遍吗？"
+
+
 def game_over() -> str:
     return f"这一局已经结束了。{AGAIN}"
