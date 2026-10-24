@@ -1,27 +1,52 @@
 import argparse
+import logging
 import os
 import sys
+from pathlib import Path
 
 import uvicorn
 
 from pozhan.case import load_case, validate
+from pozhan.config import Settings
 from pozhan.director.director import Director
 from pozhan.game import Game
-from pozhan.intent.interpreter import Interpreter, RuleMatcher
+from pozhan.gamelog import GameLog
+from pozhan.intent import Interpreter, LLMClassifier, RuleMatcher
+from pozhan.llm import OpenAICompatLLM
 from pozhan.server.app import create_app
 from pozhan.session.store import HeaderResolver, MemoryStore
 
-DEFAULT_CASE = "cases/golden-watch.yaml"
+log = logging.getLogger("pozhan")
 
 
-def build_app(case_path: str = DEFAULT_CASE):
+def build_app(settings: Settings | None = None):
+    settings = settings or Settings.from_env()
+    case = load_case(settings.case_path)
+    problems = validate(case)
+    if problems:
+        raise SystemExit("案件校验未通过：" + "；".join(p.message for p in problems))
+
+    intent_llm = suspect_llm = None
+    if settings.llm_enabled:
+        intent_llm = OpenAICompatLLM(settings.llm_base_url, settings.llm_api_key, temperature=0.0)
+        suspect_llm = OpenAICompatLLM(settings.llm_base_url, settings.llm_api_key, temperature=0.8)
+    else:
+        log.warning("未配置 LLM_BASE_URL / LLM_API_KEY：只走规则匹配，嫌疑人只会说兜底台词")
+    if not settings.api_key:
+        log.warning("未配置 POZHAN_API_KEY：接口不校验密钥，只适合本地开发")
+
     game = Game(
-        case=load_case(case_path),
-        interpreter=Interpreter(RuleMatcher(), classifier=None),
-        director=Director(llm=None, model=""),
+        case=case,
+        interpreter=Interpreter(
+            RuleMatcher(),
+            LLMClassifier(intent_llm, settings.intent_model) if intent_llm else None,
+        ),
+        director=Director(suspect_llm, settings.suspect_model),
         store=MemoryStore(),
+        log=GameLog(Path(settings.log_dir) / "games" if settings.log_dir else None),
     )
-    return create_app(game, HeaderResolver())
+    request_log = Path(settings.log_dir) / "requests.jsonl" if settings.log_requests else None
+    return create_app(game, HeaderResolver(), api_key=settings.api_key, request_log=request_log)
 
 
 def check(path: str) -> int:
@@ -33,17 +58,19 @@ def check(path: str) -> int:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s"
+    )
     parser = argparse.ArgumentParser(prog="pozhan")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    serve = sub.add_parser("serve", help="启动 OpenAI 兼容的游戏服务")
-    serve.add_argument("--host", default="127.0.0.1")
-    serve.add_argument("--port", type=int, default=8000)
-    serve.add_argument("--case", default=os.environ.get("POZHAN_CASE", DEFAULT_CASE))
+    serve = sub.add_parser("serve", help="启动 OpenAI 兼容的游戏服务（配置见环境变量，README 有说明）")
+    serve.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    serve.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     chk = sub.add_parser("check", help="校验案件文件")
     chk.add_argument("path")
     args = parser.parse_args()
 
     if args.cmd == "serve":
-        uvicorn.run(build_app(args.case), host=args.host, port=args.port)
+        uvicorn.run(build_app(), host=args.host, port=args.port)
     elif args.cmd == "check":
         sys.exit(check(args.path))
