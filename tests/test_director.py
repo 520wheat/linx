@@ -85,7 +85,7 @@ def test_emoji_follows_suspect_stage_or_stays_neutral(case):
     assert d.emoji(case, state, Answer("q")) == "😌"
     assert d.emoji(case, state, ReadClaims()) == "😶"
     raised = state.__class__(case_id=case.id, started_at=0, stage=2)
-    assert d.emoji(case, raised, Broke(case.contradictions[1], 2)) == "😱"
+    assert d.emoji(case, raised, Broke(case.contradictions[1], 2)) == "😲"
 
 
 async def test_broke_prompts_the_concession_then_narrates(case):
