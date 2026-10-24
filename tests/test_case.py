@@ -78,3 +78,8 @@ def test_missing_field_is_reported(case_data):
     del case_data["suspect"]["name"]
     with pytest.raises(CaseFormatError, match="name"):
         parse_case(case_data)
+
+
+def test_folded_yaml_spaces_between_chinese_sentences_are_removed(case):
+    assert "。 " not in case.briefing and "不见了。监控显示" in case.briefing
+    assert "KTV 包厢" in case.briefing  # 中英文之间的空格保留

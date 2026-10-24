@@ -1,9 +1,15 @@
+import re
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from pozhan.case.model import Card, Case, Claim, Contradiction, Limits, Stage, Suspect
+
+
+def _tidy(text: str) -> str:
+    """YAML 折行会在中文句子之间留下空格（「……不见了。 监控显示……」），去掉它们。"""
+    return re.sub(r"(?<=[\u3000-\u303f\uff00-\uffef\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", text.strip())
 
 
 class CaseFormatError(ValueError):
@@ -33,10 +39,10 @@ def parse_case(data: dict[str, Any]) -> Case:
         return Case(
             id=str(_require(data, "id", "案件")),
             title=_require(data, "title", "案件"),
-            briefing=_require(data, "briefing", "案件").strip(),
+            briefing=_tidy(_require(data, "briefing", "案件")),
             suspect=Suspect(
                 name=_require(suspect, "name", "suspect"),
-                persona=_require(suspect, "persona", "suspect").strip(),
+                persona=_tidy(_require(suspect, "persona", "suspect")),
                 truth=tuple(suspect.get("truth") or ()),
             ),
             claims=tuple(
@@ -59,7 +65,7 @@ def parse_case(data: dict[str, Any]) -> Case:
                 Contradiction(
                     card=int(_require(x, "card", "contradiction")),
                     claim=int(_require(x, "claim", "contradiction")),
-                    concession=_require(x, "concession", "contradiction"),
+                    concession=_tidy(_require(x, "concession", "contradiction")),
                     slip=x.get("slip") or "",
                 )
                 for x in _list(data, "contradictions")
@@ -73,7 +79,7 @@ def parse_case(data: dict[str, Any]) -> Case:
                 )
                 for s in _list(data, "stages")
             ),
-            reveal=_require(data, "reveal", "案件").strip(),
+            reveal=_tidy(_require(data, "reveal", "案件")),
             limits=Limits(strikes=int(limits.get("strikes", 3)), minutes=int(limits.get("minutes", 15))),
         )
     except (TypeError, ValueError) as e:
