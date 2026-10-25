@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from pozhan.game import Game
 from pozhan.llm.client import Message
@@ -106,6 +106,12 @@ def create_app(
         snap = (screen.latest(key) if screen else None) or build_snapshot(game.case, None, time.time())
         # hub 里存的是发布时刻的快照；前端用 serverNow 校准倒计时，所以这里换成当前时间
         return {**snap, "serverNow": time.time()}
+
+    @app.get("/")
+    async def root(request: Request):
+        # 直接打开域名时进入网页开玩；带上原来的查询参数（token 等）
+        query = request.url.query
+        return RedirectResponse("/screen?" + (query if "play=" in query else "play=1&" + query).rstrip("&"))
 
     @app.get("/screen")
     async def screen_page():

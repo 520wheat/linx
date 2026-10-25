@@ -230,3 +230,12 @@ async def test_screen_follows_the_case_switch(client_for):
     await say(http, "下一个案子")
     assert hub.published[-1]["case"]["title"] == "另一个案子"
     assert hub.published[-1]["event"]["kind"] == "briefing"
+
+
+async def test_root_redirects_to_web_play_keeping_the_token(client_for):
+    _, _, app = make()
+    http = client_for(app)
+    r = await http.get("/?token=abc")
+    assert r.status_code == 307 and r.headers["location"] == "/screen?play=1&token=abc"
+    r = await http.get("/")
+    assert r.headers["location"] == "/screen?play=1"
