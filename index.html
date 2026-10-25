@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>午夜便利店 · 审讯 Demo</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="boot" class="overlay">
+    <div class="panel">
+      <p class="kicker">CASE 01</p>
+      <h1>午夜便利店</h1>
+      <p>21:10，店员被发现倒在柜台后。嫌疑人陈默声称 21:00 一直在店里买烟。你是审讯员：点最多两张线索卡出示，再按住问话，拆穿他的不在场证明。</p>
+      <p class="note">限时 8 分钟。关键组合：便利店小票 + 小区监控。</p>
+      <button id="start" type="button">开始审讯</button>
+    </div>
+  </div>
+
+  <div id="end" class="overlay hidden">
+    <div class="panel">
+      <p class="kicker" id="endKicker">结案</p>
+      <h1 id="endTitle">不在场证明已破</h1>
+      <p id="endBody">陈默在时间线上对不上。21:02 他还在小区，不可能 21:03 自己在店里结账。</p>
+      <button id="again" type="button">再审一次</button>
+    </div>
+  </div>
+
+  <div class="app">
+    <header>
+      <div class="brand">林城分局 · 审讯室 3<strong>午夜便利店</strong></div>
+      <div class="clock">
+        <b id="timer">08:00</b>
+        <i><em id="bar"></em></i>
+      </div>
+      <div class="mood" id="mood">情绪：镇定圆谎</div>
+    </header>
+
+    <section class="stage">
+      <aside class="person">
+        <div class="lamp">
+          <div class="sil">
+            <div class="hair"></div>
+            <div class="head"></div>
+            <div class="shirt"></div>
+            <div class="coat"></div>
+          </div>
+        </div>
+        <div class="meta">
+          <h1>陈默</h1>
+          <p>嫌疑人 · 自称九点在便利店</p>
+        </div>
+      </aside>
+      <div class="chat">
+        <div class="log" id="log"></div>
+        <div class="alert" id="hint">破绽：小票 21:03 结账，监控 21:02 人还在小区门口。</div>
+        <div class="act">
+          <div class="hold" id="s0">证据位 1</div>
+          <div class="hold" id="s1">证据位 2</div>
+          <button class="mic" id="mic" type="button">按住问话</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="board">
+      <h2>线索板 · 最多出示两张</h2>
+      <div class="cards" id="cards"></div>
+    </section>
+  </div>
+
+  <script src="js/linx.js"></script>
+  <script src="js/case.js"></script>
+  <script src="js/voice.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
