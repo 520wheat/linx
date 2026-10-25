@@ -171,3 +171,38 @@ def test_device_file_upgrades_plain_ws(tmp_path):
     path = tmp_path / "devsim.json"
     path.write_text(json.dumps({"mac": "m", "client_id": "c", "token": "t", "ws_url": "ws://x/v1/ws/"}))
     assert LinxDevice.load(path).ws_url == "wss://x/v1/ws/"
+
+
+def test_typed_text_and_taps_go_to_linx_as_detect(linx):
+    # 点按操作和打字（#59）：灵矽把 detect 带的文字当作玩家的话
+    relay, made = linx
+    with make(relay) as client, client.websocket_connect("/screen/voice") as ws:
+        ws.receive_json()
+        ws.send_json({"type": "text", "text": "  用二号卡反驳证词一  "})
+        ws.send_json({"type": "text", "text": "问" * 300})
+        ws.send_json({"type": "text", "text": "   "})
+        ws.send_json({"type": "start", "mode": "auto"})
+        ws.send_json({"type": "stop"})
+        ws.receive_json()
+    texts = [json.loads(m) for m in made[0].sent if isinstance(m, str)]
+    detect = [t for t in texts if t.get("state") == "detect"]
+    assert detect[0] == {
+        "session_id": "s-1",
+        "type": "listen",
+        "state": "detect",
+        "text": "用二号卡反驳证词一",
+    }
+    assert len(detect[1]["text"]) == 100 and len(detect) == 2
+    assert {"session_id": "s-1", "type": "listen", "mode": "auto", "state": "start"} in texts
+    assert texts[-1] == {"session_id": "s-1", "type": "listen", "mode": "auto", "state": "stop"}
+
+
+def test_unknown_listen_mode_falls_back_to_manual(linx):
+    relay, made = linx
+    with make(relay) as client, client.websocket_connect("/screen/voice") as ws:
+        ws.receive_json()
+        ws.send_json({"type": "start", "mode": "realtime"})
+        ws.send_json({"type": "stop"})
+        ws.receive_json()
+    starts = [json.loads(m) for m in made[0].sent if isinstance(m, str) and '"start"' in m and "listen" in m]
+    assert starts[0]["mode"] == "manual"

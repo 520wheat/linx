@@ -15,6 +15,8 @@ log = logging.getLogger(__name__)
 
 UP_RATE, FRAME_MS = 16000, 60
 UP_FRAME_BYTES = UP_RATE * FRAME_MS // 1000 * 2  # 60ms 的 16k 单声道 s16le
+MAX_TEXT = 100  # 网页打字或点按操作发来的文字上限（#59）
+LISTEN_MODES = {"manual", "auto"}  # auto：灵矽自己判断说完（#59 实测约 0.7 秒）
 # 灵矽下发的文字消息里，网页用得上的几类：识别结果、TTS 开始/每句/结束
 FORWARD_TYPES = {"stt", "tts", "llm"}
 
@@ -125,7 +127,8 @@ class VoiceRelay:
         decoder = opuslib.Decoder(down_rate, 1)
         await browser.send_json({"type": "ready", "sampleRate": down_rate, "device": self.device.mac})
 
-        listen = {"session_id": session_id, "type": "listen", "mode": "manual"}
+        listen = {"session_id": session_id, "type": "listen"}
+        mode = "manual"
         pending = bytearray()
         speaking = False  # 灵矽正在下发语音；玩家此时开口就先打断它
 
@@ -138,6 +141,7 @@ class VoiceRelay:
                 await upstream.send(encoder.encode(frame, UP_FRAME_BYTES // 2))
 
         async def from_browser() -> None:
+            nonlocal mode
             while True:
                 msg = await browser.receive()
                 if msg["type"] == "websocket.disconnect":
@@ -146,18 +150,25 @@ class VoiceRelay:
                     pending.extend(msg["bytes"])
                     await send_frames(final=False)
                 elif msg.get("text"):
-                    kind = json.loads(msg["text"]).get("type")
+                    data = json.loads(msg["text"])
+                    kind = data.get("type")
+                    if kind in ("start", "text") and speaking:
+                        await upstream.send(json.dumps({"session_id": session_id, "type": "abort"}))
                     if kind == "start":
                         pending.clear()
-                        if speaking:
-                            await upstream.send(json.dumps({"session_id": session_id, "type": "abort"}))
-                        await upstream.send(json.dumps({**listen, "state": "start"}))
+                        mode = data.get("mode") if data.get("mode") in LISTEN_MODES else "manual"
+                        await upstream.send(json.dumps({**listen, "mode": mode, "state": "start"}))
+                    elif kind == "text":
+                        # 点按和打字（#59）：灵矽把 detect 带的文字当作玩家的话，照常走模型和情感音色
+                        text = str(data.get("text") or "").strip()[:MAX_TEXT]
+                        if text:
+                            await upstream.send(json.dumps({**listen, "state": "detect", "text": text}))
                     elif kind == "stop":
                         await send_frames(final=True)
                         silence = encoder.encode(b"\x00" * UP_FRAME_BYTES, UP_FRAME_BYTES // 2)
                         for _ in range(5):  # 300ms 静音收尾，帮助识别断句
                             await upstream.send(silence)
-                        await upstream.send(json.dumps({**listen, "state": "stop"}))
+                        await upstream.send(json.dumps({**listen, "mode": mode, "state": "stop"}))
 
         async def from_linx() -> None:
             nonlocal speaking
