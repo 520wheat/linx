@@ -69,8 +69,8 @@ async def test_full_winning_game_over_http(tmp_path):
     wrong = await c.say("用1号卡反驳证词1")
     assert wrong.startswith("😌") and "律师还有二次就到" in wrong
     broke = await c.say("用2号卡反驳证词1")
-    assert broke.startswith("😏") and "证词一被戳破" in broke
-    assert (await c.say("三号卡反驳第二条证词")).startswith("😱")
+    assert broke.startswith("😠") and "证词一被戳破" in broke
+    assert (await c.say("三号卡反驳第二条证词")).startswith("😲")
     final = await c.say("4号卡反驳证词3")
     assert final.startswith("😭") and "案件告破" in final
     assert "结束" in await c.say("你还有什么要说的")

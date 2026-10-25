@@ -61,7 +61,7 @@ async def test_presentation_discards_the_speculative_answer(case):
     game = make_game(case, llm)
     await say(game, "开始")
     reply, _ = await say(game, "电梯监控拍到你上了十八楼")
-    assert reply.startswith("😏证词一被戳破了！")
+    assert reply.startswith("😠证词一被戳破了！")
     assert llm.cancelled == 1  # 投机生成的「提问回答」被取消
     assert game.store.get("k").state.broken == (1,)
 

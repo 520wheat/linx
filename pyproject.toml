@@ -24,6 +24,7 @@ dev = [
 devsim = [
     "websockets>=13",
     "opuslib>=3.0",
+    "numpy>=2.0",
 ]
 
 [build-system]
