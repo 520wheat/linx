@@ -4,7 +4,18 @@ from typing import Any
 
 import yaml
 
-from pozhan.case.model import Card, Case, Claim, Contradiction, Limits, Stage, Suspect, TimelineStep, Unlock
+from pozhan.case.model import (
+    Card,
+    Case,
+    Claim,
+    Contradiction,
+    Limits,
+    Stage,
+    Suspect,
+    TimelineStep,
+    Unlock,
+    WeakEvidence,
+)
 
 
 def _tidy(text: str) -> str:
@@ -103,6 +114,14 @@ def parse_case(data: dict[str, Any]) -> Case:
                     card=int(t["card"]) if t.get("card") is not None else None,
                 )
                 for t in (data.get("timeline") or [])
+            ),
+            weak=tuple(
+                WeakEvidence(
+                    card=int(_require(w, "card", "weak")),
+                    claim=int(_require(w, "claim", "weak")),
+                    reason=_tidy(_require(w, "reason", "weak")),
+                )
+                for w in (data.get("weak") or [])
             ),
         )
     except (TypeError, ValueError) as e:

@@ -104,6 +104,12 @@ def validate(case: Case) -> list[Problem]:
         if step.card is not None and step.card not in card_ids:
             add("refs-exist", f"时间线「{step.text[:12]}」引用了不存在的线索卡 {step.card}")
 
+    for w in case.weak:
+        if w.card not in card_ids or w.claim not in claim_ids:
+            add("refs-exist", f"间接证据（卡 {w.card} × 证词 {w.claim}）引用了不存在的卡或证词")
+        if case.contradiction(w.card, w.claim) is not None:
+            add("weak-is-breaker", f"卡 {w.card} 能戳破证词 {w.claim}，不能同时登记为间接证据")
+
     if case.limits.strikes < 1 or case.limits.minutes < 1:
         add("limits", "律师倒计时的次数和分钟数都必须大于 0")
 

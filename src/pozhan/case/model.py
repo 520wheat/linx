@@ -44,6 +44,15 @@ class Contradiction:
 
 
 @dataclass(frozen=True)
+class WeakEvidence:
+    """沾边但驳不倒的出示（#49）：不扣次数，嫌疑人按 reason 搪塞过去。"""
+
+    card: int
+    claim: int
+    reason: str
+
+
+@dataclass(frozen=True)
 class Stage:
     """嫌疑人的心理档位。每戳破一条矛盾升一档，最后一档即认罪。"""
 
@@ -90,6 +99,7 @@ class Case:
     reveal: str
     limits: Limits = field(default_factory=Limits)
     timeline: tuple[TimelineStep, ...] = ()  # 可选，陪玩屏结局页使用（#37）
+    weak: tuple[WeakEvidence, ...] = ()  # 可选，间接证据（#49）
 
     @property
     def opening_claims(self) -> tuple[Claim, ...]:
@@ -103,3 +113,6 @@ class Case:
 
     def contradiction(self, card_id: int, claim_id: int) -> Contradiction | None:
         return next((x for x in self.contradictions if x.card == card_id and x.claim == claim_id), None)
+
+    def weak_evidence(self, card_id: int, claim_id: int) -> WeakEvidence | None:
+        return next((w for w in self.weak if w.card == card_id and w.claim == claim_id), None)
