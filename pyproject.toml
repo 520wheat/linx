@@ -21,6 +21,11 @@ dev = [
     "ruff>=0.6",
 ]
 
+devsim = [
+    "websockets>=13",
+    "opuslib>=3.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
