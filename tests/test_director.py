@@ -153,7 +153,8 @@ async def test_narrator_only_outcomes(case):
     s = new_game(case, 0)
     assert "已经被戳破" in (await lines(d, case, s, AlreadyBroken(1)))[0].text
     assert "律师" in (await lines(d, case, s, Lawyer("strikes")))[0].text
-    assert case.reveal in (await lines(d, case, s, Lawyer("timeout")))[0].text
+    lost = (await lines(d, case, s, Lawyer("timeout")))[0].text
+    assert case.reveal not in lost and "讲讲真相" in lost  # 输了不自动揭晓（#55）
     assert "十四分钟" in (await lines(d, case, s, Remaining(2, 14 * 60)))[0].text
     assert "几号卡" in (await lines(d, case, s, Clarify(None, 1)))[0].text
 

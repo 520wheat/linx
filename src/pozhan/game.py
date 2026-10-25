@@ -17,6 +17,7 @@ from pozhan.engine.outcomes import (
     Broke,
     CaseList,
     Confession,
+    Hint,
     Lawyer,
     Outcome,
     Quit,
@@ -143,6 +144,8 @@ class Game:
                 event = {"kind": "lawyer", "reason": reason}
             case Quit():
                 event = {"kind": "quit"}
+            case Hint(kind=kind):
+                event = {"kind": "hint", "hintKind": kind}
         if event is not None:
             session.event_seq += 1
             session.event = {"id": session.event_seq, **event}

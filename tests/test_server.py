@@ -88,7 +88,7 @@ async def test_losing_game_and_restart(tmp_path):
     await c.say("1号卡反驳证词1")
     await c.say("1号卡反驳证词2")
     lost = await c.say("1号卡反驳证词3")
-    assert "律师到了" in lost and "真相是" in lost
+    assert "律师到了" in lost and "讲讲真相" in lost
     again = await c.say("重新开始")
     assert again.startswith("😌") and "九点到十点" in again
     assert "律师还有两次" in await c.say("1号卡反驳证词1")

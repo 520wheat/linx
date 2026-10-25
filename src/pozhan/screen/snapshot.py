@@ -7,6 +7,7 @@
 from typing import Any
 
 from pozhan.case.model import Case
+from pozhan.engine.rules import rating
 from pozhan.engine.state import Phase
 from pozhan.session.store import Session
 
@@ -94,6 +95,9 @@ def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str,
             "broken": len(state.broken),
             "claimCount": len(case.contradictions),
             "strikes": state.strikes,
+            "hints": state.hints,
+            "blurts": state.blurts,
+            "rating": rating(state),
             "elapsedSeconds": max(0, int(ended - state.started_at)),
             "timeline": [
                 {"time": t.time, "text": t.text, "card": t.card, "cardTitle": _card_title(case, t.card)}

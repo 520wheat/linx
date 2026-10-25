@@ -151,6 +151,12 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .verdict.lost .badge { background: var(--muted-card); color: var(--ink-2); }
 .verdict h1 { margin: 20px 0 0; font-size: 112px; font-weight: 900; line-height: 1.05; color: var(--accent-ink); }
 .verdict.lost h1 { color: var(--ink); }
+/* 评级（#55）：一个大字母 + 一句原因，和旁白报的一致 */
+.grade { display: flex; align-items: center; gap: 16px; margin-top: 18px; font-size: 20px; color: var(--ink-2); }
+.grade[hidden] { display: none; }
+.grade b { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: var(--solid);
+  color: #fff; font: 900 40px var(--mono); }
+.grade b.s { background: var(--accent-ink); }
 .stats { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .stats div { display: flex; flex-direction: column-reverse; gap: 6px; padding: 18px 20px; border-radius: 12px; background: var(--soft); }
 .stats dt { font-size: 14px; color: var(--ink-3); }
@@ -322,13 +328,14 @@ body.portrait #cluesBtn { display: none; }
     <header class="brandrow"><span class="brand">破绽</span><span class="tag">CASE 01</span><span class="case-title" data-bind="title"></span></header>
     <div class="end">
       <div class="card verdict" id="verdict">
-        <div><span class="badge" id="vBadge"></span><h1 id="vTitle"></h1></div>
+        <div><span class="badge" id="vBadge"></span><h1 id="vTitle"></h1>
+          <div class="grade" id="vGrade" hidden><b id="vGradeLetter"></b><span id="vGradeWhy"></span></div></div>
         <dl class="stats">
           <div><dt>戳破证词</dt><dd id="sBroken"></dd></div>
           <div><dt>出示错误</dt><dd id="sStrikes"></dd></div>
           <div><dt>审讯用时</dt><dd id="sTime"></dd></div>
         </dl>
-        <p class="again"><span data-hint="again">再来一局，对设备说</span> <b>「重新开始」</b></p>
+        <p class="again"><span data-hint="again">对设备说</span> <b>「讲讲真相」「下一个案子」「重新开始」</b></p>
       </div>
       <div class="card truth" aria-label="真相复盘">
         <div class="head"><h2>真相</h2><span class="mono small">TIMELINE</span></div>
@@ -480,6 +487,17 @@ body.portrait #cluesBtn { display: none; }
     $("vTitle").textContent = r.won ? "案件告破" : r.phase === "quit" ? "结束审讯" : "律师到了";
     $("sBroken").textContent = `${r.broken}/${r.claimCount}`;
     $("sStrikes").textContent = String(r.strikes);
+    // 评级（#55）：原因的说法和旁白 rating_reason 保持一致
+    $("vGrade").hidden = !r.rating;
+    if (r.rating) {
+      const why = [];
+      if (r.strikes) why.push(`出示错${cn(r.strikes)}次`);
+      if (r.hints) why.push(`用了${cn(r.hints)}次提示`);
+      if (r.blurts) why.push(`${cn(r.blurts)}条证词是他自己说漏的`);
+      $("vGradeLetter").textContent = r.rating;
+      $("vGradeLetter").className = r.rating === "S" ? "s" : "";
+      $("vGradeWhy").textContent = `评级 · ${why.join("，") || "零失误"}`;
+    }
     $("sTime").textContent = mmss(r.elapsedSeconds);
     $("steps").replaceChildren(...r.timeline.map((t) => {
       const li = el("li");
@@ -648,7 +666,7 @@ body.portrait #cluesBtn { display: none; }
     const setState = (state, text) => { talk.dataset.state = state; talkText.textContent = text; };
     for (const n of document.querySelectorAll('[data-hint="say"]')) n.textContent = "按住按钮说";
     for (const n of document.querySelectorAll('[data-hint="line"]')) n.textContent = "点右下角「开始游戏」，按住说「开始审讯」。";
-    for (const n of document.querySelectorAll('[data-hint="again"]')) n.textContent = "再来一局，按住说";
+    for (const n of document.querySelectorAll('[data-hint="again"]')) n.textContent = "按住说";
 
     let heardTimer = 0;
     const say = (text, ms = 4000) => {

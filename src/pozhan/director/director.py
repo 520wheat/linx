@@ -20,6 +20,7 @@ from pozhan.engine.outcomes import (
     CaseList,
     Confession,
     GameOver,
+    Hint,
     Lawyer,
     Outcome,
     Quit,
@@ -28,10 +29,12 @@ from pozhan.engine.outcomes import (
     Remaining,
     Revealed,
     Rules,
+    Truth,
     UnknownRef,
     Weak,
     Wrong,
 )
+from pozhan.engine.rules import rating
 from pozhan.engine.state import Interrogation
 from pozhan.intent.interpreter import Clarify
 from pozhan.llm.client import LLM, Message
@@ -123,7 +126,7 @@ class Director:
                     case, state, task_confess(case, x), history, may_confess=True
                 ):
                     yield line
-                yield say(narrator.confession_wrap(case))
+                yield say(narrator.confession_wrap(case, state, rating(state) or "C"))
             case Wrong(card=card, claim=claim, strikes_left=left):
                 yield say(narrator.wrong(state.label(claim)))
                 async for line in self._suspect(case, state, task_wrong(case, card, claim), history):
@@ -153,6 +156,10 @@ class Director:
                 yield say(narrator.rules(case))
             case Quit():
                 yield say(narrator.quit_game(case))
+            case Hint(kind=kind, claim=claim, card=card):
+                yield say(narrator.hint(case, state, kind, claim, card))
+            case Truth(available=available):
+                yield say(narrator.truth(case, available))
             case CaseList(titles=titles, current=current):
                 yield say(narrator.case_list(titles, current))
             case GameOver():

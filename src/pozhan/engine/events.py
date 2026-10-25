@@ -15,6 +15,8 @@ class CommandKind(StrEnum):
     QUIT = "quit"  # 结束游戏
     NEXT_CASE = "next_case"  # 下一个案子（#53）
     LIST_CASES = "list_cases"  # 有哪些案子（#53）
+    HINT = "hint"  # 给点提示（#55）
+    TRUTH = "truth"  # 讲讲真相（#55）
 
 
 @dataclass(frozen=True)

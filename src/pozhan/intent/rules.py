@@ -47,7 +47,14 @@ def _strip_card(text: str) -> tuple[int | None, str]:
 _COMMANDS: list[tuple[CommandKind, re.Pattern[str]]] = [
     (CommandKind.NEXT_CASE, re.compile(r"(?:下一个|下个|换个|换一个|新的?|别的)案子|换(?:个|一个)案件")),
     (CommandKind.LIST_CASES, re.compile(r"(?:有|还有)(?:哪些|什么|几个)案子|案子(?:列表|有哪些)")),
-    (CommandKind.RESTART, re.compile(r"重新开始|再来一局|重开一局|再玩一局")),
+    (CommandKind.RESTART, re.compile(r"重新开始|再来一局|重开一局|再玩一局|再审一次|再试一次")),
+    (
+        CommandKind.HINT,
+        re.compile(
+            r"给(?:点|个|一点|我)?提示|有没有提示|要(?:个)?提示|^提示$|卡住了|没(?:有)?头绪|不知道(?:该)?(?:怎么办|问什么)"
+        ),
+    ),
+    (CommandKind.TRUTH, re.compile(r"讲讲真相|真相是什么|告诉我真相|公布(?:答案|真相)|说说真相|答案是什么")),
     (CommandKind.QUIT, re.compile(r"结束游戏|退出游戏|不玩了|游戏结束吧")),
     (CommandKind.START, re.compile(r"^(?:开始审讯|开始游戏|开始吧|开一局)")),
     (CommandKind.REPEAT, re.compile(r"再说一遍|再说一次|没听清|重复一遍|重复一下|刚才说什么")),
