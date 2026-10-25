@@ -17,6 +17,7 @@ from pozhan.llm import OpenAICompatLLM
 from pozhan.screen import ScreenHub
 from pozhan.server.app import create_app
 from pozhan.session.store import HeaderResolver, MemoryStore
+from pozhan.voice import LinxDevice, VoiceRelay
 
 log = logging.getLogger("pozhan")
 
@@ -57,6 +58,7 @@ def build_app(settings: Settings | None = None):
         screen=screen,
     )
     request_log = Path(settings.log_dir) / "requests.jsonl" if settings.log_requests else None
+    voice = VoiceRelay(LinxDevice.load(settings.linx_device)) if settings.linx_device else None
     return create_app(
         game,
         HeaderResolver(),
@@ -64,6 +66,7 @@ def build_app(settings: Settings | None = None):
         request_log=request_log,
         screen=screen,
         screen_token=settings.screen_token,
+        voice=voice,
     )
 
 

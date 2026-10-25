@@ -107,13 +107,25 @@ uv run --group devsim python tools/devsim.py play scripts/win.txt
 
 陪玩屏是一块只读的大屏网页，跟着语音对局实时更新，适合电视、平板或路演投影。所有操作仍然靠语音。
 
-1. 服务端设置只读令牌（和接口密钥 `POZHAN_API_KEY` 分开，泄露了也只能看、不能操作）：`-e POZHAN_SCREEN_TOKEN=换成一个随机串`。
+1. 服务端设置只读令牌（和接口密钥 `POZHAN_API_KEY` 分开；没开网页开玩时，泄露了也只能看、不能操作）：`-e POZHAN_SCREEN_TOKEN=换成一个随机串`。
 2. 在电视或电脑浏览器里打开 `服务地址/screen?token=<POZHAN_SCREEN_TOKEN>`，全屏显示即可。
    - 默认显示**最近活跃的一局**。同时有多台设备时，在链接后面加上 `&device=<设备 MAC>`。
    - 强调色可以用 `&accent=sage` / `mist` / `amber` 切换，默认是珊瑚色。
 3. 画面会随对局自动切换：开局 → 审讯中 → 戳破瞬间（3 秒）→ 结局。
 
 **数据更新方式**：页面优先用 SSE 接收推送。如果 4 秒内一条推送都没收到，会自动改为每 0.8 秒轮询一次状态。原因是 **Cloudflare 临时隧道（trycloudflare）不支持 SSE**，有些代理也会缓冲流式响应。在固定域名和普通反向代理下，SSE 照常工作；用 Nginx 做反向代理时，`/screen/events` 需要关闭缓冲（服务端已经带了 `X-Accel-Buffering: no` 响应头）。
+
+## 网页开玩（可选）
+
+没有灵矽硬件也能玩：打开 `服务地址/screen?play=1&token=<POZHAN_SCREEN_TOKEN>`，页面底部出现「开始游戏」按钮，点一下授权麦克风，之后**按住按钮（或空格键）说话，松开发送**。语音识别和嫌疑人的情感语音全部走灵矽，和真机体验一致。
+
+原理：网页充当一台灵矽设备。浏览器的 WebSocket 设不了灵矽握手要求的请求头，所以由服务端中转：浏览器 ⇄ 16k PCM ⇄ `/screen/voice` ⇄ Opus ⇄ 灵矽。
+
+1. 准备一台虚拟设备并绑定到智能体：运行 `uv run --group devsim python tools/devsim.py ota` 拿到 6 位激活码，在智控台「设备管理 → 新增」里填入；绑定后再运行一次，连接信息会保存到 `.data/devsim.json`。
+2. 服务端设置 `POZHAN_LINX_DEVICE=.data/devsim.json`（Docker 里把这个文件挂进容器）。服务端需要系统库 libopus（镜像里已装；macOS 上 `brew install opus`）。
+3. 必须用 **HTTPS** 打开页面，浏览器才允许使用麦克风。
+
+限制：一台虚拟设备同一时间只服务**一个**网页玩家，第二个人会看到「已经有人在网页上玩了」。开了网页开玩以后，拿到 `POZHAN_SCREEN_TOKEN` 的人就能操作对局，不要公开这个链接。
 
 ## 换音色时检验语气
 
@@ -131,5 +143,7 @@ uv run --group devsim python tools/devsim.py play scripts/win.txt
 | 嫌疑人只会重复几句固定台词 | 服务端没有配置 `LLM_BASE_URL` / `LLM_API_KEY`，或者大模型调用失败。查服务日志里的 `suspect generation failed` |
 | 回复很慢 | 确认 `LLM_EXTRA_BODY` 关闭了思考（默认已关闭）；用 `evals/latency.py` 比较模型的首字延迟 |
 | 不确定平台发来的请求长什么样 | 设置 `POZHAN_LOG_REQUESTS=1`，原始请求会写到 `logs/requests.jsonl`（不含鉴权头） |
+| 网页开玩一直「正在连接灵矽…」 | 检查 `POZHAN_LINX_DEVICE` 指向的设备是否已在智控台绑定到本智能体；「我的模型」的 API 密钥不能为空，否则灵矽握手后会立刻断开 |
+| 网页开玩按下按钮没反应 | 页面必须是 HTTPS，并在浏览器地址栏里允许使用麦克风 |
 | 陪玩屏一直停在开局画面 | 检查链接里的 `token` 是否和 `POZHAN_SCREEN_TOKEN` 一致；指定了 `device` 时，检查设备 MAC 是否写对 |
 | 多台设备会串局 | 平台请求里没有设备标识时，所有设备共用一局。设置 `POZHAN_LOG_REQUESTS=1` 后查看请求头，并在 Issue 里反馈 |

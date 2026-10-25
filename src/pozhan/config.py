@@ -10,6 +10,7 @@ class Settings:
     case_path: str = "cases/golden-watch.yaml"
     api_key: str = ""  # 灵矽「我的模型」里填的 API 密钥；为空则不校验（仅限本地开发）
     screen_token: str = ""  # 陪玩屏的只读令牌；为空则不校验（仅限本地开发）
+    linx_device: str = ""  # 网页开玩用的灵矽设备身份文件（#43）；为空则不开放网页开玩
     llm_base_url: str = ""
     llm_api_key: str = ""
     # 默认模型依据 #22 的评测：意图分类要快且准，嫌疑人要演得好
@@ -27,6 +28,7 @@ class Settings:
             case_path=env.get("POZHAN_CASE", cls.case_path),
             api_key=env.get("POZHAN_API_KEY", ""),
             screen_token=env.get("POZHAN_SCREEN_TOKEN", ""),
+            linx_device=env.get("POZHAN_LINX_DEVICE", ""),
             llm_base_url=env.get("LLM_BASE_URL", ""),
             llm_api_key=env.get("LLM_API_KEY", ""),
             intent_model=env.get("INTENT_MODEL", cls.intent_model),

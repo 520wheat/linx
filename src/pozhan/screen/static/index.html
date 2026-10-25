@@ -23,6 +23,8 @@ body { color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: anti
 .mono { font-family: var(--mono); }
 
 /* 画面按 1600×900 布局，再等比缩放到视口 */
+/* 画布包在固定定位、裁掉溢出的视口里：否则手机浏览器会被 1600px 宽的画布撑大布局视口，画面被裁掉一块 */
+#viewport { position: fixed; inset: 0; overflow: hidden; }
 #stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform-origin: center; }
 .scene { position: absolute; inset: 0; padding: 36px 56px; display: flex; flex-direction: column; gap: 24px;
   opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s linear .35s; }
@@ -163,9 +165,55 @@ header.top { display: flex; align-items: center; justify-content: space-between;
   opacity: 0; transition: opacity .3s; }
 #conn.show { opacity: 1; }
 #conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--solid); }
+
+/* 网页开玩（?play=1，#43）：按住说话。放在画面之外，不随 1600×900 缩放，手机上也按得到 */
+/* 开玩时画面让出底部一条给按钮，避免挡住字幕 */
+#play { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; display: none; align-items: center; gap: 10px; }
+#play button { white-space: nowrap; }
+body.play #play { display: flex; }
+body.play #conn { right: auto; left: 14px; }
+#play .heard { position: absolute; right: calc(100% + 12px); top: 50%; transform: translateY(-50%); white-space: nowrap;
+  max-width: calc(50vw - 110px); overflow: hidden; text-overflow: ellipsis; padding: 8px 12px; border-radius: 10px; background: var(--card);
+  border: 1px solid var(--line); font-size: 14px; color: var(--ink-2); opacity: 0; transition: opacity .3s; }
+#play .heard.show { opacity: 1; }
+@media (max-width: 720px) {
+  #play .heard { right: auto; left: 50%; top: auto; bottom: calc(100% + 8px); transform: translateX(-50%); max-width: calc(100vw - 32px); }
+}
+#talk { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px 0 18px; border: 0; border-radius: 999px;
+  background: var(--solid); color: #fff; font: 700 17px var(--sans); cursor: pointer; touch-action: none; user-select: none;
+  -webkit-user-select: none; -webkit-touch-callout: none; box-shadow: 0 6px 18px rgba(42, 54, 68, .18); transition: transform .12s, background .2s; }
+#cluesBtn { min-height: 52px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink); font: 700 16px var(--sans); cursor: pointer; }
+#cluesBtn[aria-expanded="true"] { background: var(--tint); color: var(--accent-ink); border-color: var(--solid); }
+#clues { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 110px); overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(42, 54, 68, .16); }
+#clues[hidden] { display: none; }
+#clues .pline { display: none; padding: 4px 4px 8px; font-size: 16px; line-height: 1.7; }
+#clues .pline b { margin-right: 6px; color: var(--accent-ink); }
+#clueList { display: flex; flex-direction: column; gap: 10px; }
+/* 手机竖屏：画布缩得很小，字幕和线索卡固定放在画布下面，用正常字号显示 */
+body.portrait #clues, body.portrait #clues[hidden] { display: flex; left: 16px; right: 16px; bottom: 80px; width: auto; max-height: none;
+  transform: none; box-shadow: none; }
+body.portrait #clues .pline { display: block; }
+body.portrait #clues .pline:empty { display: none; }
+body.portrait #cluesBtn { display: none; }
+#clues .clue-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 12px; border-radius: 10px; background: var(--soft); }
+#clues .clue-row.used { opacity: .55; }
+#clues .no { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: var(--chip);
+  font: 700 18px var(--mono); }
+#clues b { display: block; margin-bottom: 4px; font-size: 16px; }
+#clues p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink-2); }
+#talk:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 3px; }
+#talk[data-state="talking"] { transform: scale(1.06); background: var(--accent-ink); }
+#talk[data-state="connecting"], #talk[data-state="off"] { background: var(--ink-3); }
+#talk svg { flex: none; }
+#talk[data-state="talking"] svg { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
 </style>
 </head>
 <body>
+<div id="viewport">
 <div id="stage">
 
   <!-- 开局 -->
@@ -185,7 +233,7 @@ header.top { display: flex; align-items: center; justify-content: space-between;
       </div>
       <div class="side">
         <div class="say">
-          <span class="label" style="color: inherit">对设备说</span>
+          <span class="label" style="color: inherit" data-hint="say">对设备说</span>
           <div class="big">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
             「开始审讯」
@@ -232,7 +280,7 @@ header.top { display: flex; align-items: center; justify-content: space-between;
     </div>
     <footer class="card subtitle">
       <span class="speaker" id="speaker">旁白</span>
-      <p id="lineText">对设备说话开始审讯。</p>
+      <p id="lineText" data-hint="line">对设备说话开始审讯。</p>
       <span class="small" style="white-space: nowrap">出示：「用 X 号卡反驳证词 Y」</span>
     </footer>
     <div class="toast" id="toast" role="status"></div>
@@ -267,7 +315,7 @@ header.top { display: flex; align-items: center; justify-content: space-between;
           <div><dt>出示错误</dt><dd id="sStrikes"></dd></div>
           <div><dt>审讯用时</dt><dd id="sTime"></dd></div>
         </dl>
-        <p class="again">再来一局，对设备说 <b>「重新开始」</b></p>
+        <p class="again"><span data-hint="again">再来一局，对设备说</span> <b>「重新开始」</b></p>
       </div>
       <div class="card truth" aria-label="真相复盘">
         <div class="head"><h2>真相</h2><span class="mono small">TIMELINE</span></div>
@@ -277,7 +325,17 @@ header.top { display: flex; align-items: center; justify-content: space-between;
     </div>
   </section>
 </div>
+</div>
 <div id="conn" role="status"><i></i><span>正在重新连接…</span></div>
+<div id="clues" hidden aria-label="线索卡"><p class="pline" id="pline" aria-live="polite"></p><div id="clueList"></div></div>
+<div id="play">
+  <div class="heard" id="heard" role="status"></div>
+  <button id="cluesBtn" type="button" aria-expanded="false" aria-controls="clues">线索卡</button>
+  <button id="talk" type="button" data-state="idle">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <span id="talkText">开始游戏</span>
+  </button>
+</div>
 
 <script>
 "use strict";
@@ -299,8 +357,16 @@ header.top { display: flex; align-items: center; justify-content: space-between;
   const mmss = (s) => `${pad(Math.floor(Math.max(0, s) / 60))}:${pad(Math.floor(Math.max(0, s) % 60))}`;
 
   // 按 1600×900 等比缩放到视口
+  const DOCK = 80;  // 网页开玩时底部留给「按住说话」的高度
   const fit = () => {
-    const s = Math.min(innerWidth / 1600, innerHeight / 900);
+    const reserve = document.body.classList.contains("play") ? DOCK : 0;
+    const vp = $("viewport");
+    const portrait = reserve > 0 && vp.clientHeight > vp.clientWidth * 1.2;
+    document.body.classList.toggle("portrait", portrait);
+    const s = Math.min(vp.clientWidth / 1600, (vp.clientHeight - reserve) / 900);
+    // 竖屏时画布贴顶，下面留给字幕和线索卡
+    $("stage").style.top = portrait ? `${12 + 450 * s}px` : `${(vp.clientHeight - reserve) / 2}px`;
+    $("clues").style.top = portrait ? `${24 + 900 * s}px` : "";
     $("stage").style.transform = `translate(-50%, -50%) scale(${s})`;
   };
   addEventListener("resize", fit);
@@ -433,11 +499,28 @@ header.top { display: flex; align-items: center; justify-content: space-between;
     return snap.scene;
   }
 
+  // 网页开玩时的线索卡面板：网页玩家手里没有打印出来的卡
+  function renderClues() {
+    if (!snap.cards) return;
+    const line = snap.line;
+    const pline = $("pline");
+    pline.replaceChildren();
+    if (line && line.text) pline.append(el("b", null, speakerName(line)), document.createTextNode(line.text));
+    $("clueList").replaceChildren(...snap.cards.map((card) => {
+      const row = el("div", "clue-row" + (card.used ? " used" : ""));
+      const body = el("div");
+      body.append(el("b", null, card.used ? `${card.title} · 已用` : card.title), el("p", null, card.text || ""));
+      row.append(el("span", "no", String(card.id)), body);
+      return row;
+    }));
+  }
+
   function apply(next) {
     const first = snap === null;
     snap = next;
     clockOffset = snap.serverNow - Date.now() / 1000;
     renderCommon();
+    renderClues();
     if (snap.claims) renderInterrogation();
     if (snap.result) renderEnded();
 
@@ -499,8 +582,173 @@ header.top { display: flex; align-items: center; justify-content: space-between;
     }, 4000);
   }
 
+  // ---- 网页开玩（?play=1，#43）：网页充当一台灵矽设备，语音识别和情感语音都走灵矽 ----
+  // 麦克风采到的音频重采样成 16k 单声道 s16le 发给服务端，服务端编码成 Opus 转给灵矽；
+  // 灵矽的语音由服务端解码成 PCM 发回来，这里按顺序排队播放。
+  const WORKLET = `
+    class Mic extends AudioWorkletProcessor {
+      constructor() { super(); this.step = sampleRate / 16000; this.pos = 0; this.out = new Int16Array(960); this.n = 0; }
+      process(inputs) {
+        const x = inputs[0] && inputs[0][0];
+        if (!x) return true;
+        // 线性插值降采样到 16k，凑满 60ms（960 个采样）发一次
+        for (; this.pos < x.length - 1; this.pos += this.step) {
+          const i = Math.floor(this.pos), f = this.pos - i;
+          const v = Math.max(-1, Math.min(1, x[i] * (1 - f) + x[i + 1] * f));
+          this.out[this.n++] = v < 0 ? v * 0x8000 : v * 0x7fff;
+          if (this.n === this.out.length) { this.port.postMessage(this.out.slice().buffer); this.n = 0; }
+        }
+        this.pos -= x.length;
+        return true;
+      }
+    }
+    registerProcessor("mic", Mic);`;
+
+  async function startPlay(base) {
+    document.body.classList.add("play");
+    fit();
+    const q = new URLSearchParams();
+    if (params.get("token")) q.set("token", params.get("token"));
+    const talk = $("talk"), talkText = $("talkText"), heard = $("heard");
+    const setState = (state, text) => { talk.dataset.state = state; talkText.textContent = text; };
+    for (const n of document.querySelectorAll('[data-hint="say"]')) n.textContent = "按住按钮说";
+    for (const n of document.querySelectorAll('[data-hint="line"]')) n.textContent = "点右下角「开始游戏」，按住说「开始审讯」。";
+    for (const n of document.querySelectorAll('[data-hint="again"]')) n.textContent = "再来一局，按住说";
+
+    let heardTimer = 0;
+    const say = (text, ms = 4000) => {
+      heard.textContent = text;
+      heard.classList.add("show");
+      clearTimeout(heardTimer);
+      heardTimer = setTimeout(() => heard.classList.remove("show"), ms);
+    };
+
+    let ctx = null, mic = null, ws = null, ready = false, holding = false, outRate = 24000;
+    let playAt = 0;
+    const playing = new Set();
+    const stopPlayback = () => { for (const s of playing) { try { s.stop(); } catch {} } playing.clear(); playAt = 0; };
+    const play = (buf) => {
+      const pcm = new Int16Array(buf);
+      if (!pcm.length) return;
+      const ab = ctx.createBuffer(1, pcm.length, outRate);
+      const ch = ab.getChannelData(0);
+      for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 0x8000;
+      const src = ctx.createBufferSource();
+      src.buffer = ab;
+      src.connect(ctx.destination);
+      playAt = Math.max(playAt, ctx.currentTime + 0.08);  // 留一点余量，网络抖动时不断音
+      src.start(playAt);
+      playAt += ab.duration;
+      playing.add(src);
+      src.onended = () => playing.delete(src);
+    };
+
+    const send = (obj) => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); };
+
+    // 连上服务端的中转；灵矽空闲久了会断开，下次按下时再连
+    const open = () => new Promise((resolve, reject) => {
+      const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(`${scheme}//${location.host}${base}voice?${q}`);
+      ws.binaryType = "arraybuffer";
+      ready = false;
+      ws.onmessage = (m) => {
+        if (typeof m.data !== "string") { play(m.data); return; }
+        const msg = JSON.parse(m.data);
+        if (msg.type === "ready") { outRate = msg.sampleRate; ready = true; resolve(); }
+        else if (msg.type === "busy") { say("已经有人在网页上玩了，稍后再试", 6000); reject(new Error("busy")); }
+        else if (msg.type === "error") { say(msg.message, 6000); reject(new Error(msg.message)); }
+        else if (msg.type === "stt" && msg.text) say(`你：${msg.text.replace(/\s*\[[A-Za-z_]+的说\]\s*$/, "")}`);
+      };
+      ws.onclose = () => {
+        ready = false;
+        if (holding) { holding = false; setState("idle", "按住说话"); }
+        reject(new Error("closed"));
+      };
+    });
+
+    const ensure = async () => {
+      if (!ctx) {
+        // 必须在用户点按时创建，浏览器才允许出声和开麦
+        ctx = new AudioContext();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
+        await ctx.audioWorklet.addModule(url);
+        mic = new AudioWorkletNode(ctx, "mic");
+        mic.port.onmessage = (m) => { if (holding && ready && ws.readyState === WebSocket.OPEN) ws.send(m.data); };
+        ctx.createMediaStreamSource(stream).connect(mic);
+      }
+      if (ctx.state === "suspended") await ctx.resume();
+      if (!ws || ws.readyState > WebSocket.OPEN || !ready) await open();
+    };
+
+    const down = async (e) => {
+      if (e) e.preventDefault();
+      if (holding || talk.dataset.state === "connecting") return;
+      if (!window.isSecureContext || !navigator.mediaDevices) { say("需要用 https 打开本页才能使用麦克风", 8000); return; }
+      try {
+        if (!ready) setState("connecting", "正在连接灵矽…");
+        await ensure();
+      } catch (err) {
+        setState("idle", "开始游戏");
+        if (err && err.name === "NotAllowedError") say("没有麦克风权限：请在浏览器地址栏允许使用麦克风", 8000);
+        return;
+      }
+      if (talk.dataset.state === "connecting") {
+        // 第一次点击只负责连接和授权，之后才是按住说话
+        setState("idle", "按住说话");
+        say("连上了。按住按钮说「开始审讯」，说完松开");
+        return;
+      }
+      stopPlayback();  // 打断嫌疑人：玩家开口时先停掉正在播的语音
+      holding = true;
+      setState("talking", "松开发送");
+      send({ type: "start" });
+    };
+    const up = (e) => {
+      if (e) e.preventDefault();
+      if (!holding) return;
+      holding = false;
+      setState("idle", "按住说话");
+      send({ type: "stop" });
+    };
+
+    const cluesBtn = $("cluesBtn");
+    cluesBtn.addEventListener("click", () => {
+      const open = $("clues").hidden;
+      $("clues").hidden = !open;
+      cluesBtn.setAttribute("aria-expanded", String(open));
+    });
+
+    talk.addEventListener("pointerdown", (e) => { talk.setPointerCapture(e.pointerId); down(e); });
+    talk.addEventListener("pointerup", up);
+    talk.addEventListener("pointercancel", up);
+    talk.addEventListener("contextmenu", (e) => e.preventDefault());
+    // 电脑上也可以按住空格说话
+    addEventListener("keydown", (e) => { if (e.code === "Space" && !e.repeat) down(e); });
+    addEventListener("keyup", (e) => { if (e.code === "Space") up(e); });
+  }
+
   show("briefing");
-  connect();
+  if (params.get("play") === "1") {
+    const base = location.pathname.replace(/\/?$/, "/");
+    const q = new URLSearchParams();
+    if (params.get("token")) q.set("token", params.get("token"));
+    fetch(`${base}voice/status?${q}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then((st) => {
+        if (st && st.enabled) {
+          // 陪玩屏只跟网页这台设备的对局，不被别的设备上的对局抢走画面
+          if (!params.get("device") && st.device) params.set("device", st.device);
+          startPlay(base);
+        }
+        connect();
+      });
+  } else {
+    connect();
+  }
 })();
 </script>
 </body>
