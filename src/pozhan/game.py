@@ -49,7 +49,7 @@ class Game:
             yield session.last_reply
             return
 
-        reply = [self.director.emoji(self.case, session.state)]
+        reply = [self.director.emoji(self.case, session.state, outcome)]
         yield reply[0]
         async for line in self.director.speak(self.case, session.state, outcome, history):
             reply.append(line.text)
