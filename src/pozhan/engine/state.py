@@ -22,6 +22,9 @@ class Interrogation:
     idle: int = 0  # 距上次进展的提问数
     # 已经说出口的证词编号，按说出口的顺序（#46）。玩家听到的「证词 N」是这里的第 N 条，不是案件文件里的编号
     revealed: tuple[int, ...] = ()
+    hints: int = 0  # 主动要提示的次数（#55，计入评级）
+    blurts: int = 0  # 卡住后嫌疑人自己说漏的次数（#53，计入评级）
+    hint_target: tuple[str, int] | None = None  # 上一次提示指向哪里；同一处再求助，提示更具体
 
     def label(self, claim_id: int) -> int | None:
         """案件里的证词编号 → 玩家口中的证词序号。"""

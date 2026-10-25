@@ -11,6 +11,7 @@ from pozhan.engine.outcomes import (
     Broke,
     Confession,
     GameOver,
+    Hint,
     Lawyer,
     Outcome,
     Quit,
@@ -20,6 +21,7 @@ from pozhan.engine.outcomes import (
     Repeat,
     Revealed,
     Rules,
+    Truth,
     UnknownRef,
     Weak,
     Wrong,
@@ -27,7 +29,13 @@ from pozhan.engine.outcomes import (
 from pozhan.engine.state import Interrogation, Phase
 
 # 游戏结束后仍然可以回答的查询类指令
-_QUERIES = {CommandKind.READ_CLAIMS, CommandKind.READ_CARD, CommandKind.RULES, CommandKind.REPEAT}
+_QUERIES = {
+    CommandKind.READ_CLAIMS,
+    CommandKind.READ_CARD,
+    CommandKind.RULES,
+    CommandKind.REPEAT,
+    CommandKind.TRUTH,
+}
 
 
 def new_game(case: Case, now: float) -> Interrogation:
@@ -44,6 +52,34 @@ def open_topics(case: Case, state: Interrogation) -> list[Claim]:
         and c.id not in state.revealed
         and (c.unlock.after is None or c.unlock.after in state.broken)
     ]
+
+
+def rating(state: Interrogation) -> str | None:
+    """评级（#55）：只有破案才评。失误 = 出示错误 + 主动要提示 + 卡住后靠他自己说漏。"""
+    if state.phase is not Phase.CONFESSED:
+        return None
+    misses = state.strikes + state.hints + state.blurts
+    return "S" if misses == 0 else "A" if misses <= 1 else "B" if misses <= 3 else "C"
+
+
+def _hint(case: Case, state: Interrogation) -> tuple[Interrogation, Outcome]:
+    """逐级提示（#55）：先指方向，同一处再求助就点名答案。每次求助都计入评级。"""
+    breakable = {x.claim for x in case.contradictions}
+    pending = [c for c in state.revealed if c not in state.broken and c in breakable]
+    topics = open_topics(case, state)
+    if pending:
+        target = ("claim", pending[0])
+        if state.hint_target == target:
+            x = next(x for x in case.contradictions if x.claim == pending[0])
+            hint = Hint("card", claim=pending[0], card=x.card)
+        else:
+            hint = Hint("claim", claim=pending[0])
+    elif topics:
+        target = ("topic", topics[0].id)
+        hint = Hint("topic", claim=topics[0].id) if state.hint_target == target else Hint("unsaid")
+    else:
+        return state, Hint("none")
+    return replace(state, hints=state.hints + 1, hint_target=target), hint
 
 
 def stage_for(case: Case, broken: int, confessed: bool) -> int:
@@ -89,6 +125,8 @@ def apply(case: Case, state: Interrogation, event: Event, now: float) -> tuple[I
     if isinstance(event, Command):
         if event.kind is CommandKind.START:
             return state, Briefing()
+        if event.kind is CommandKind.HINT:
+            return _hint(case, state)
         return state, _query(case, state, event, now)
     if isinstance(event, Present):
         return _present(case, state, event)
@@ -105,6 +143,8 @@ def _query(case: Case, state: Interrogation, event: Command, now: float) -> Outc
             return ReadCard(event.card)
         case CommandKind.REPEAT:
             return Repeat()
+        case CommandKind.TRUTH:
+            return Truth(available=state.over)
         case CommandKind.REMAINING:
             return Remaining(
                 strikes_left=case.limits.strikes - state.strikes,
@@ -126,9 +166,8 @@ def _ask(case: Case, state: Interrogation, event: Ask) -> tuple[Interrogation, O
     idle = state.idle + 1
     all_said_broken = all(c in state.broken for c in state.revealed)
     if topics and all_said_broken and idle >= STUCK_ASKS:
-        return replace(state, revealed=(*state.revealed, topics[0].id), idle=0), Revealed(
-            topics[0].id, blurted=True
-        )
+        state = replace(state, revealed=(*state.revealed, topics[0].id), idle=0, blurts=state.blurts + 1)
+        return state, Revealed(topics[0].id, blurted=True)
     stage = case.stages[state.stage]
     if idle >= stage.slip_every:
         slip = next_slip(case, state)

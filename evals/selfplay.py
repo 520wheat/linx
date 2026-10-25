@@ -80,7 +80,7 @@ async def play_one(app, llm, case, n: int) -> dict:
             transcript.append((utterance, reply))
             if "案件告破" in reply:
                 return {"won": True, "turns": len(transcript), "transcript": transcript}
-            if "律师到了" in reply or "游戏结束" in reply:
+            if "律师到了" in reply or "审讯结束。" in reply:
                 return {"won": False, "turns": len(transcript), "transcript": transcript}
             detective_msgs += [
                 {"role": "assistant", "content": utterance},

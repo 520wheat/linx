@@ -151,6 +151,12 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .verdict.lost .badge { background: var(--muted-card); color: var(--ink-2); }
 .verdict h1 { margin: 20px 0 0; font-size: 112px; font-weight: 900; line-height: 1.05; color: var(--accent-ink); }
 .verdict.lost h1 { color: var(--ink); }
+/* 评级（#55）：一个大字母 + 一句原因，和旁白报的一致 */
+.grade { display: flex; align-items: center; gap: 16px; margin-top: 18px; font-size: 20px; color: var(--ink-2); }
+.grade[hidden] { display: none; }
+.grade b { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; background: var(--solid);
+  color: #fff; font: 900 40px var(--mono); }
+.grade b.s { background: var(--accent-ink); }
 .stats { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .stats div { display: flex; flex-direction: column-reverse; gap: 6px; padding: 18px 20px; border-radius: 12px; background: var(--soft); }
 .stats dt { font-size: 14px; color: var(--ink-3); }
@@ -198,7 +204,7 @@ body.play #conn { right: auto; left: 14px; }
 #cluesBtn { min-height: 52px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
   color: var(--ink); font: 700 16px var(--sans); cursor: pointer; }
 #cluesBtn[aria-expanded="true"] { background: var(--tint); color: var(--accent-ink); border-color: var(--solid); }
-#clues { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px));
+#clues { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 110px); overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px;
   background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(42, 54, 68, .16); }
 #clues[hidden] { display: none; }
@@ -206,7 +212,7 @@ body.play #conn { right: auto; left: 14px; }
 #clues .pline b { margin-right: 6px; color: var(--accent-ink); }
 #clueList { display: flex; flex-direction: column; gap: 10px; }
 /* 手机竖屏：画布缩得很小，字幕和线索卡固定放在画布下面，用正常字号显示 */
-body.portrait #clues, body.portrait #clues[hidden] { display: flex; left: 16px; right: 16px; bottom: 80px; width: auto; max-height: none;
+body.portrait #clues, body.portrait #clues[hidden] { display: flex; left: 16px; right: 16px; bottom: 100px; width: auto; max-height: none;
   transform: none; box-shadow: none; }
 body.portrait #clues .pline { display: block; }
 body.portrait #clues .pline:empty { display: none; }
@@ -222,6 +228,18 @@ body.portrait #cluesBtn { display: none; }
 #talk[data-state="connecting"], #talk[data-state="off"] { background: var(--ink-3); }
 #talk svg { flex: none; }
 #talk[data-state="talking"] svg { animation: pulse 1s ease-in-out infinite; }
+#talk[data-state="thinking"] { background: var(--ink-3); }
+#talk[data-state="thinking"] #talkText { animation: pulse 1.2s ease-in-out infinite; }
+#talk[data-state="speaking"] { background: var(--ink-2); }
+/* 音量条（#56）：只在按住说话时显示 */
+.meter { display: none; align-items: center; gap: 3px; height: 22px; }
+#talk[data-state="talking"] .meter { display: flex; }
+.meter i { width: 4px; height: 22px; border-radius: 2px; background: #fff; transform: scaleY(.2); transition: transform 60ms linear; }
+/* 「可以说」提示条（#56）：只是提示，不能点击，语音仍是唯一的输入 */
+#sayline { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); display: none; max-width: calc(100vw - 32px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--ink-3); }
+body.play #sayline { display: block; }
+#sayline b { margin: 0 2px; font-weight: 500; color: var(--ink); }
 @keyframes pulse { 50% { opacity: .45; } }
 </style>
 </head>
@@ -322,13 +340,14 @@ body.portrait #cluesBtn { display: none; }
     <header class="brandrow"><span class="brand">破绽</span><span class="tag">CASE 01</span><span class="case-title" data-bind="title"></span></header>
     <div class="end">
       <div class="card verdict" id="verdict">
-        <div><span class="badge" id="vBadge"></span><h1 id="vTitle"></h1></div>
+        <div><span class="badge" id="vBadge"></span><h1 id="vTitle"></h1>
+          <div class="grade" id="vGrade" hidden><b id="vGradeLetter"></b><span id="vGradeWhy"></span></div></div>
         <dl class="stats">
           <div><dt>戳破证词</dt><dd id="sBroken"></dd></div>
           <div><dt>出示错误</dt><dd id="sStrikes"></dd></div>
           <div><dt>审讯用时</dt><dd id="sTime"></dd></div>
         </dl>
-        <p class="again"><span data-hint="again">再来一局，对设备说</span> <b>「重新开始」</b></p>
+        <p class="again"><span data-hint="again">对设备说</span> <b>「讲讲真相」「下一个案子」「重新开始」</b></p>
       </div>
       <div class="card truth" aria-label="真相复盘">
         <div class="head"><h2>真相</h2><span class="mono small">TIMELINE</span></div>
@@ -341,12 +360,14 @@ body.portrait #cluesBtn { display: none; }
 </div>
 <div id="conn" role="status"><i></i><span>正在重新连接…</span></div>
 <div id="clues" hidden aria-label="线索卡"><p class="pline" id="pline" aria-live="polite"></p><div id="clueList"></div></div>
+<div id="sayline" aria-live="polite"></div>
 <div id="play">
   <div class="heard" id="heard" role="status"></div>
   <button id="cluesBtn" type="button" aria-expanded="false" aria-controls="clues">线索卡</button>
   <button id="talk" type="button" data-state="idle">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     <span id="talkText">开始游戏</span>
+    <span class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
   </button>
 </div>
 
@@ -370,7 +391,7 @@ body.portrait #cluesBtn { display: none; }
   const mmss = (s) => `${pad(Math.floor(Math.max(0, s) / 60))}:${pad(Math.floor(Math.max(0, s) % 60))}`;
 
   // 按 1600×900 等比缩放到视口
-  const DOCK = 80;  // 网页开玩时底部留给「按住说话」的高度
+  const DOCK = 104;  // 网页开玩时底部留给「可以说」和「按住说话」的高度
   const fit = () => {
     const reserve = document.body.classList.contains("play") ? DOCK : 0;
     const vp = $("viewport");
@@ -480,6 +501,17 @@ body.portrait #cluesBtn { display: none; }
     $("vTitle").textContent = r.won ? "案件告破" : r.phase === "quit" ? "结束审讯" : "律师到了";
     $("sBroken").textContent = `${r.broken}/${r.claimCount}`;
     $("sStrikes").textContent = String(r.strikes);
+    // 评级（#55）：原因的说法和旁白 rating_reason 保持一致
+    $("vGrade").hidden = !r.rating;
+    if (r.rating) {
+      const why = [];
+      if (r.strikes) why.push(`出示错${cn(r.strikes)}次`);
+      if (r.hints) why.push(`用了${cn(r.hints)}次提示`);
+      if (r.blurts) why.push(`${cn(r.blurts)}条证词是他自己说漏的`);
+      $("vGradeLetter").textContent = r.rating;
+      $("vGradeLetter").className = r.rating === "S" ? "s" : "";
+      $("vGradeWhy").textContent = `评级 · ${why.join("，") || "零失误"}`;
+    }
     $("sTime").textContent = mmss(r.elapsedSeconds);
     $("steps").replaceChildren(...r.timeline.map((t) => {
       const li = el("li");
@@ -541,6 +573,7 @@ body.portrait #cluesBtn { display: none; }
     renderClues();
     if (snap.claims) renderInterrogation();
     if (snap.result) renderEnded();
+    renderSay();
 
     // 只播放页面打开之后发生的事件：刷新或重连时不重放旧的「戳破瞬间」
     const ev = snap.event;
@@ -550,7 +583,9 @@ body.portrait #cluesBtn { display: none; }
         renderMoment(ev);
         momentUntil = Date.now() + 3000;
         setTimeout(() => show(chooseScene()), 3050);
-      } else if (!first && ev.kind === "weak") {
+      }
+      if (!first) sfx(ev.kind);
+      if (!first && ev.kind === "weak") {
         toast([document.createTextNode(`${ev.card} 号卡驳不倒证词${cn(ev.claim)}，`), el("b", null, "不够硬"), document.createTextNode(" · 不扣次数")]);
       } else if (!first && ev.kind === "revealed") {
         toast([document.createTextNode("新证词 "), el("b", null, pad(ev.claim)), document.createTextNode(`：${ev.claimText}`)]);
@@ -563,6 +598,48 @@ body.portrait #cluesBtn { display: none; }
     if (Date.now() < momentUntil && ev && (ev.kind === "broke" || ev.kind === "confession")) renderMoment(ev);
     show(chooseScene());
     tick();
+  }
+
+  // 「可以说」：按场景给两三句能直接说的话（#56）
+  function renderSay() {
+    const say = $("sayline");
+    if (!say) return;
+    const scene = snap ? chooseScene() : "briefing";
+    const phrases = scene === "ended" ? ["讲讲真相", "下一个案子", "重新开始"]
+      : scene === "briefing" ? ["开始审讯", "有哪些案子"]
+      : ["念一下证词", "给点提示", "用 X 号卡反驳证词 Y"];
+    say.replaceChildren(document.createTextNode("可以说："), ...phrases.flatMap((p) => [el("b", null, `「${p}」`)]));
+  }
+
+  // 音效（#56）：WebAudio 现场合成，不需要素材文件。网页开玩默认开启；陪玩屏加 &sfx=1 才开启，避免和设备的声音打架
+  let sfxCtx = null;
+  if (params.get("sfx") === "1") {
+    addEventListener("pointerdown", () => { sfxCtx = sfxCtx || new AudioContext(); }, { once: true });
+  }
+  function tone(t0, freq, dur, { type = "sine", gain = 0.25, to = null } = {}) {
+    const o = sfxCtx.createOscillator(), g = sfxCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(sfxCtx.destination);
+    o.start(t0);
+    o.stop(t0 + dur + 0.05);
+  }
+  function sfx(kind) {
+    if (!sfxCtx) return;
+    const t = sfxCtx.currentTime + 0.02;
+    switch (kind) {
+      case "broke": tone(t, 150, 0.32, { to: 48, gain: 0.5 }); tone(t, 900, 0.08, { type: "triangle", gain: 0.12 }); break;
+      case "confession": [523, 659, 784, 1047].forEach((f, i) => tone(t + i * 0.11, f, 0.6, { type: "triangle", gain: 0.18 })); break;
+      case "wrong": tone(t, 110, 0.38, { type: "sawtooth", gain: 0.12, to: 82 }); break;
+      case "lawyer": [392, 330, 262].forEach((f, i) => tone(t + i * 0.18, f, 0.5, { type: "sawtooth", gain: 0.08 })); break;
+      case "revealed": tone(t, 880, 0.18, { gain: 0.15 }); tone(t + 0.1, 1320, 0.25, { gain: 0.12 }); break;
+      case "weak": tone(t, 440, 0.16, { type: "triangle", gain: 0.12 }); break;
+      case "hint": tone(t, 660, 0.12, { gain: 0.12 }); tone(t + 0.12, 990, 0.18, { gain: 0.1 }); break;
+    }
   }
 
   // 令牌缺失或错误时，说清楚该怎么办，而不是一直显示「正在重新连接」
@@ -622,7 +699,7 @@ body.portrait #cluesBtn { display: none; }
   // 灵矽的语音由服务端解码成 PCM 发回来，这里按顺序排队播放。
   const WORKLET = `
     class Mic extends AudioWorkletProcessor {
-      constructor() { super(); this.step = sampleRate / 16000; this.pos = 0; this.out = new Int16Array(960); this.n = 0; }
+      constructor() { super(); this.step = sampleRate / 16000; this.pos = 0; this.out = new Int16Array(960); this.n = 0; this.sq = 0; }
       process(inputs) {
         const x = inputs[0] && inputs[0][0];
         if (!x) return true;
@@ -631,7 +708,12 @@ body.portrait #cluesBtn { display: none; }
           const i = Math.floor(this.pos), f = this.pos - i;
           const v = Math.max(-1, Math.min(1, x[i] * (1 - f) + x[i + 1] * f));
           this.out[this.n++] = v < 0 ? v * 0x8000 : v * 0x7fff;
-          if (this.n === this.out.length) { this.port.postMessage(this.out.slice().buffer); this.n = 0; }
+          this.sq += v * v;
+          if (this.n === this.out.length) {
+            // 顺带算出这 60ms 的音量，给按钮上的音量条用（#56）
+            this.port.postMessage({ buf: this.out.slice().buffer, level: Math.sqrt(this.sq / this.n) });
+            this.n = 0; this.sq = 0;
+          }
         }
         this.pos -= x.length;
         return true;
@@ -646,9 +728,23 @@ body.portrait #cluesBtn { display: none; }
     if (params.get("token")) q.set("token", params.get("token"));
     const talk = $("talk"), talkText = $("talkText"), heard = $("heard");
     const setState = (state, text) => { talk.dataset.state = state; talkText.textContent = text; };
+    const suspectName = () => (snap && snap.case ? snap.case.suspect.name : "嫌疑人");
+    // 音量条：说话时随音量起伏，证明麦克风在收音（#56）
+    const bars = [...document.querySelectorAll("#meter i")];
+    const meter = (level) => {
+      const lit = Math.min(bars.length, Math.ceil(Math.min(1, Math.sqrt(level) * 2.4) * bars.length));
+      bars.forEach((b, i) => { b.style.transform = `scaleY(${i < lit ? 0.35 + 0.65 * ((i + 1) / bars.length) : 0.2})`; });
+    };
+    let thinkingSince = 0;
+    // 「在想」→「在说」→ 回到「按住说话」：按播放进度切换（#56）
+    setInterval(() => {
+      const st = talk.dataset.state;
+      if (st === "thinking" && Date.now() - thinkingSince > 20000) setState("idle", "按住说话");
+      if (st === "speaking" && ctx && ctx.currentTime > playAt + 0.3) setState("idle", "按住说话");
+    }, 250);
     for (const n of document.querySelectorAll('[data-hint="say"]')) n.textContent = "按住按钮说";
     for (const n of document.querySelectorAll('[data-hint="line"]')) n.textContent = "点右下角「开始游戏」，按住说「开始审讯」。";
-    for (const n of document.querySelectorAll('[data-hint="again"]')) n.textContent = "再来一局，按住说";
+    for (const n of document.querySelectorAll('[data-hint="again"]')) n.textContent = "按住说";
 
     let heardTimer = 0;
     const say = (text, ms = 4000) => {
@@ -671,6 +767,7 @@ body.portrait #cluesBtn { display: none; }
       const src = ctx.createBufferSource();
       src.buffer = ab;
       src.connect(ctx.destination);
+      if (talk.dataset.state === "thinking" || talk.dataset.state === "idle") setState("speaking", "按住打断");
       playAt = Math.max(playAt, ctx.currentTime + 0.08);  // 留一点余量，网络抖动时不断音
       src.start(playAt);
       playAt += ab.duration;
@@ -711,7 +808,12 @@ body.portrait #cluesBtn { display: none; }
         const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
         await ctx.audioWorklet.addModule(url);
         mic = new AudioWorkletNode(ctx, "mic");
-        mic.port.onmessage = (m) => { if (holding && ready && ws.readyState === WebSocket.OPEN) ws.send(m.data); };
+        mic.port.onmessage = (m) => {
+          if (!holding) return;
+          meter(m.data.level);
+          if (ready && ws.readyState === WebSocket.OPEN) ws.send(m.data.buf);
+        };
+        sfxCtx = ctx;
         ctx.createMediaStreamSource(stream).connect(mic);
       }
       if (ctx.state === "suspended") await ctx.resume();
@@ -745,7 +847,9 @@ body.portrait #cluesBtn { display: none; }
       if (e) e.preventDefault();
       if (!holding) return;
       holding = false;
-      setState("idle", "按住说话");
+      meter(0);
+      thinkingSince = Date.now();
+      setState("thinking", `${suspectName()}在想…`);
       send({ type: "stop" });
     };
 

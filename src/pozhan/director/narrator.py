@@ -147,17 +147,56 @@ def remaining(strikes_left: int, seconds_left: int) -> str:
     return f"还能出示错{count(strikes_left)}次，审讯时间还剩{duration(seconds_left)}。"
 
 
-def confession_wrap(case: Case) -> str:
-    return f"案件告破！真相是：{case.reveal}{AGAIN}"
+def rating_reason(state: Interrogation) -> str:
+    parts = []
+    if state.strikes:
+        parts.append(f"出示错{count(state.strikes)}次")
+    if state.hints:
+        parts.append(f"用了{count(state.hints)}次提示")
+    if state.blurts:
+        parts.append(f"有{count(state.blurts)}条证词是他自己说漏的")
+    return "，".join(parts) or "零失误"
+
+
+def confession_wrap(case: Case, state: Interrogation, grade: str) -> str:
+    """破案（#55）：认罪时嫌疑人已经说了经过和动机，旁白不再念整段真相，只报评级和接下来能做什么。"""
+    return (
+        f"案件告破！评级{grade}：{rating_reason(state)}。"
+        "想听完整经过，就说「讲讲真相」；说「下一个案子」换一个新案子。"
+    )
 
 
 def lawyer(case: Case, reason: str) -> str:
+    # 输了不自动揭晓（#55）：给玩家留一个再试一次的理由
     why = "出示错得太多，" if reason == "strikes" else "审讯时间到了，"
-    return f"{why}{case.suspect.name}的律师到了，他不会再开口了。真相是：{case.reveal}{AGAIN}"
+    return (
+        f"{why}{case.suspect.name}的律师到了，他不会再开口了。"
+        "说「重新开始」再审一次，想听答案就说「讲讲真相」。"
+    )
 
 
 def quit_game(case: Case) -> str:
-    return f"游戏结束。真相是：{case.reveal}{AGAIN}"
+    return "审讯结束。说「重新开始」再来一局，想听答案就说「讲讲真相」。"
+
+
+def truth(case: Case, available: bool) -> str:
+    if not available:
+        return "还没破案呢。实在想听答案，就先说「结束游戏」。"
+    return f"真相是：{case.reveal}"
+
+
+def hint(case: Case, state: Interrogation, kind: str, claim: int | None, card: int | None) -> str:
+    """提示（#55）：先指方向，再点名。"""
+    if kind == "claim":
+        return f"盯紧证词{cn(state.label(claim))}：{case.claim(claim).text}想想手里哪张卡和它对不上。"
+    if kind == "card":
+        c = case.card(card)
+        return f"试试用{cn(c.id)}号卡「{c.title}」，反驳证词{cn(state.label(claim))}。"
+    if kind == "unsaid":
+        return "他说出口的都被戳破了，可还有话没说。想想手里没用上的卡跟什么事有关，就问他那件事。"
+    if kind == "topic":
+        return f"试着问他：{case.claim(claim).unlock.examples[0]}。"
+    return "现在没什么可提示的，继续审吧。"
 
 
 def case_list(titles: tuple[str, ...], current: int) -> str:

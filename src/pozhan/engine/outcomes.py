@@ -115,6 +115,25 @@ class Quit:
 
 
 @dataclass(frozen=True)
+class Hint:
+    """提示（#55）。
+
+    kind：claim 指出该盯的证词；card 点名用哪张卡；unsaid 提醒他还有话没说；topic 点名该问什么。
+    """
+
+    kind: Literal["claim", "card", "unsaid", "topic", "none"]
+    claim: int | None = None
+    card: int | None = None
+
+
+@dataclass(frozen=True)
+class Truth:
+    """讲讲真相（#55）。只有对局结束后才讲。"""
+
+    available: bool
+
+
+@dataclass(frozen=True)
 class CaseList:
     """念案件库里的案子（#53）。current 是正在玩的案子在列表里的下标。"""
 
@@ -144,6 +163,8 @@ Outcome = (
     | Rules
     | Repeat
     | Quit
+    | Hint
+    | Truth
     | CaseList
     | GameOver
 )

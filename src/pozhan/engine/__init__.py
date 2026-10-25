@@ -12,6 +12,7 @@ from pozhan.engine.outcomes import (
     CaseList,
     Confession,
     GameOver,
+    Hint,
     Lawyer,
     Outcome,
     Quit,
@@ -21,11 +22,12 @@ from pozhan.engine.outcomes import (
     Repeat,
     Revealed,
     Rules,
+    Truth,
     UnknownRef,
     Weak,
     Wrong,
 )
-from pozhan.engine.rules import apply, new_game, open_topics
+from pozhan.engine.rules import apply, new_game, open_topics, rating
 from pozhan.engine.state import Interrogation, Phase
 
 __all__ = [
@@ -40,6 +42,7 @@ __all__ = [
     "Confession",
     "Event",
     "GameOver",
+    "Hint",
     "Interrogation",
     "Lawyer",
     "Outcome",
@@ -52,10 +55,12 @@ __all__ = [
     "Repeat",
     "Revealed",
     "Rules",
+    "Truth",
     "UnknownRef",
     "Weak",
     "Wrong",
     "apply",
     "new_game",
     "open_topics",
+    "rating",
 ]
