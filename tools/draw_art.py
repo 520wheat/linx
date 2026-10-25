@@ -1,5 +1,6 @@
 # ruff: noqa: E501  提示词是英文长句，按句子折行比按 110 列折行更好读
-"""陪玩屏美术（#61、#63）：用七牛 MAAS 的 openai/gpt-image-2 生成嫌疑人立绘、案件封面和线索卡插图。
+"""陪玩屏美术（#61、#63、#64）：用七牛 MAAS 的 openai/gpt-image-2 生成嫌疑人立绘、案件封面和线索卡插图，
+再用图片编辑接口在原立绘上改表情，得到同一个人慌张、崩溃时的样子。
 
 同一套风格前缀保证几张图放在一起是一个系列；生成的原图放 art/raw/（不进仓库），
 压缩后的成品放 src/pozhan/screen/static/img/<案件 id>/。
@@ -64,6 +65,14 @@ CARDS = {
     },
 }
 
+# 嫌疑人表情（#64）：在原立绘上只改表情，保证是同一个人；心理防线越往后越慌
+REACTIONS = {
+    "nervous": "Same person, same outfit, same framing, same illustration style and plain background. Change only the "
+    "expression: getting nervous under questioning, a forced smile, eyes darting sideways, a bead of sweat on the temple.",
+    "broken": "Same person, same outfit, same framing, same illustration style and plain background. Change only the "
+    "expression and posture: caught and giving up, eyes lowered, brows knitted, shoulders slumped, visible sweat.",
+}
+
 ART = {
     "golden-watch": {
         "suspect": "A 38-year-old Chinese office administration manager, neat short hair, white shirt with a loosened "
@@ -105,14 +114,30 @@ def prompt_for(case_id: str, kind: str) -> str:
 async def draw(client: httpx.AsyncClient, case_id: str, kind: str, sem: asyncio.Semaphore) -> None:
     raw = RAW / case_id / f"{kind}.png"
     size = kind.split("-")[0]  # card-3 → card
-    if not raw.exists():
+    base = os.environ["LLM_BASE_URL"].rstrip("/")
+    auth = {"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"}
+    if not raw.exists() and kind.startswith("suspect-"):
+        source = RAW / case_id / "suspect.png"
+        async with sem:
+            r = await client.post(
+                f"{base}/images/edits",
+                headers=auth,
+                data={
+                    "model": MODEL,
+                    "prompt": STYLE + " " + REACTIONS[kind.removeprefix("suspect-")],
+                    "size": SIZES[size],
+                },
+                files={"image": ("suspect.png", source.read_bytes(), "image/png")},
+            )
+    elif not raw.exists():
         prompt = prompt_for(case_id, kind)
         async with sem:
             r = await client.post(
-                f"{os.environ['LLM_BASE_URL'].rstrip('/')}/images/generations",
-                headers={"Authorization": f"Bearer {os.environ['LLM_API_KEY']}"},
+                f"{base}/images/generations",
+                headers=auth,
                 json={"model": MODEL, "prompt": prompt, "size": SIZES[size], "n": 1},
             )
+    if not raw.exists():
         r.raise_for_status()
         raw.parent.mkdir(parents=True, exist_ok=True)
         raw.write_bytes(base64.b64decode(r.json()["data"][0]["b64_json"]))
@@ -145,7 +170,12 @@ async def main(case_ids: list[str]) -> None:
         jobs = [
             draw(client, c, k, sem)
             for c in case_ids
-            for k in ["suspect", "cover", *(f"card-{i}" for i in CARDS.get(c, {}))]
+            for k in [
+                "suspect",
+                "cover",
+                *(f"suspect-{r}" for r in REACTIONS),
+                *(f"card-{i}" for i in CARDS.get(c, {})),
+            ]
         ]
         for result in await asyncio.gather(*jobs, return_exceptions=True):
             if isinstance(result, Exception):
