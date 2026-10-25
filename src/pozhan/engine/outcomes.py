@@ -87,6 +87,11 @@ class Rules:
 
 
 @dataclass(frozen=True)
+class Repeat:
+    """「再说一遍」：由 game 原样复述上一轮回复，不经过大模型。"""
+
+
+@dataclass(frozen=True)
 class Quit:
     pass
 
@@ -109,6 +114,7 @@ Outcome = (
     | ReadCard
     | Remaining
     | Rules
+    | Repeat
     | Quit
     | GameOver
 )
