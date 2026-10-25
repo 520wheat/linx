@@ -11,11 +11,13 @@ from pozhan.case.model import Case
 from pozhan.director import narrator
 from pozhan.director.director import NEUTRAL, Director, Line
 from pozhan.engine.events import Ask, Command, CommandKind, Event
-from pozhan.engine.outcomes import Briefing, Outcome, Repeat
+from pozhan.engine.outcomes import Briefing, Broke, Confession, Lawyer, Outcome, Quit, Repeat, Wrong
 from pozhan.engine.rules import apply, new_game
 from pozhan.engine.state import Interrogation
 from pozhan.gamelog import GameLog
 from pozhan.intent.interpreter import Clarify, Interpreter
+from pozhan.screen.hub import ScreenHub
+from pozhan.screen.snapshot import build_snapshot
 from pozhan.session.store import Session, SessionStore
 
 _DONE = object()
@@ -62,6 +64,7 @@ class Game:
         store: SessionStore,
         log: GameLog | None = None,
         clock: Callable[[], float] = time.time,
+        screen: ScreenHub | None = None,
     ) -> None:
         self.case = case
         self.interpreter = interpreter
@@ -69,6 +72,43 @@ class Game:
         self.store = store
         self.log = log or GameLog(None)
         self.clock = clock
+        self.screen = screen
+
+    def _publish(self, session: Session) -> None:
+        if self.screen is not None:
+            self.screen.publish(session.key, build_snapshot(self.case, session, self.clock()))
+
+    def _mark(self, session: Session, outcome: Outcome | Clarify, prev_stage: int, now: float) -> None:
+        """把陪玩屏关心的关键事件记到会话上（#38）。字段只放公开信息。"""
+        state = session.state
+        event: dict | None = None
+        match outcome:
+            case Briefing():
+                session.line, session.ended_at = None, None
+                event = {"kind": "briefing"}
+            case Broke(contradiction=x) | Confession(contradiction=x):
+                claim, card = self.case.claim(x.claim), self.case.card(x.card)
+                event = {
+                    "kind": "confession" if isinstance(outcome, Confession) else "broke",
+                    "claim": x.claim,
+                    "claimText": claim.text if claim else "",
+                    "card": x.card,
+                    "cardTitle": card.title if card else "",
+                    "cardText": card.text if card else "",
+                    "fromStage": self.case.stages[prev_stage].name,
+                    "toStage": self.case.stages[state.stage].name,
+                }
+            case Wrong(card=card, claim=claim, strikes_left=left):
+                event = {"kind": "wrong", "card": card, "claim": claim, "strikesLeft": left}
+            case Lawyer(reason=reason):
+                event = {"kind": "lawyer", "reason": reason}
+            case Quit():
+                event = {"kind": "quit"}
+        if event is not None:
+            session.event_seq += 1
+            session.event = {"id": session.event_seq, **event}
+        if state.over and session.ended_at is None:
+            session.ended_at = now
 
     async def turn(self, key: str, text: str, *, voice_emotion: str | None = None) -> AsyncIterator[str]:
         """处理玩家的一句话，按增量产出要说的文本。第一段永远是本轮情绪 emoji。"""
@@ -93,6 +133,7 @@ class Game:
     ) -> AsyncIterator[str]:
         t0 = time.monotonic()
         now = self.clock()
+        prev_stage = session.state.stage if session.state else 0
         spec: _Speculation | None = None
         event: Event | Clarify
 
@@ -136,6 +177,10 @@ class Game:
             yield session.last_reply
             return
 
+        # 规则结果一出来就推给陪玩屏，不等台词生成：「戳破瞬间」要在 1 秒内出现（#36 验收标准 2）
+        self._mark(session, outcome, prev_stage, now)
+        self._publish(session)
+
         emoji = self.director.emoji(self.case, session.state, outcome)
         yield emoji
         parts: list[str] = []
@@ -143,6 +188,11 @@ class Game:
         async for line in lines:
             t_first = t_first or time.monotonic() - t0
             parts.append(line.text)
+            if session.line and session.line["speaker"] == line.speaker and session.line.get("turn") == t0:
+                session.line = {**session.line, "text": session.line["text"] + line.text}
+            else:
+                session.line = {"speaker": line.speaker, "text": line.text, "turn": t0}
+            self._publish(session)
             yield line.text
 
         spoken = "".join(parts)

@@ -14,6 +14,7 @@ from pozhan.game import Game
 from pozhan.gamelog import GameLog
 from pozhan.intent import Interpreter, LLMClassifier, RuleMatcher
 from pozhan.llm import OpenAICompatLLM
+from pozhan.screen import ScreenHub
 from pozhan.server.app import create_app
 from pozhan.session.store import HeaderResolver, MemoryStore
 
@@ -41,6 +42,9 @@ def build_app(settings: Settings | None = None):
     if not settings.api_key:
         log.warning("未配置 POZHAN_API_KEY：接口不校验密钥，只适合本地开发")
 
+    screen = ScreenHub()
+    if not settings.screen_token:
+        log.warning("未配置 POZHAN_SCREEN_TOKEN：陪玩屏数据不校验令牌，只适合本地开发")
     game = Game(
         case=case,
         interpreter=Interpreter(
@@ -50,9 +54,17 @@ def build_app(settings: Settings | None = None):
         director=Director(suspect_llm, settings.suspect_model),
         store=MemoryStore(),
         log=GameLog(Path(settings.log_dir) / "games" if settings.log_dir else None),
+        screen=screen,
     )
     request_log = Path(settings.log_dir) / "requests.jsonl" if settings.log_requests else None
-    return create_app(game, HeaderResolver(), api_key=settings.api_key, request_log=request_log)
+    return create_app(
+        game,
+        HeaderResolver(),
+        api_key=settings.api_key,
+        request_log=request_log,
+        screen=screen,
+        screen_token=settings.screen_token,
+    )
 
 
 def check(path: str) -> int:
