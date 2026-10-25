@@ -132,12 +132,14 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .moment { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center; }
 .moment .chip { padding: 6px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line);
   font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: .12em; color: var(--ink-2); }
-.moment h1 { margin: 0; font-size: 156px; font-weight: 900; line-height: 1; letter-spacing: .04em; color: var(--accent-ink); }
-.scene.active .moment h1 { animation: stamp .45s cubic-bezier(.2, .9, .3, 1.3) both; }
+.moment h1 { margin: 0; padding: 4px 44px 10px; border: 10px solid currentColor; border-radius: 22px; font-size: 156px; font-weight: 900;
+  line-height: 1; letter-spacing: .06em; color: var(--accent-ink); transform: rotate(-5deg); }
+.scene.active .moment h1 { animation: stamp .42s cubic-bezier(.2, .9, .3, 1.2) both; }
 /* 新说出口的证词（#46）：沿用「戳破瞬间」的强调色闪一下 */
 .claim.fresh { animation: fresh 2.4s ease-out; }
 @keyframes fresh { 0%, 30% { background: var(--tint); box-shadow: inset 0 0 0 2px var(--solid); } 100% { background: var(--card); box-shadow: none; } }
-@keyframes stamp { from { opacity: 0; transform: scale(1.18); } to { opacity: 1; transform: none; } }
+@keyframes stamp { from { opacity: 0; transform: rotate(-5deg) scale(1.7); } 60% { opacity: 1; transform: rotate(-5deg) scale(.94); }
+  to { opacity: 1; transform: rotate(-5deg); } }
 .moment .was { margin: 0; max-width: 1100px; font-size: 30px; line-height: 1.5; color: var(--ink-3);
   text-decoration: line-through; text-decoration-color: var(--solid); text-decoration-thickness: 3px; }
 .evidence { display: flex; align-items: center; gap: 22px; margin-top: 18px; padding: 18px 28px 18px 18px; text-align: left; }
@@ -190,89 +192,115 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .denied b { font-size: 22px; }
 .denied p { margin: 0; max-width: 420px; font-size: 16px; line-height: 1.7; color: var(--ink-3); }
 
-/* 网页开玩（?play=1，#43）：按住说话。放在画面之外，不随 1600×900 缩放，手机上也按得到 */
-/* 开玩时画面让出底部一条给按钮，避免挡住字幕 */
-#play { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; display: none; align-items: center; gap: 10px; }
-#play button { white-space: nowrap; }
-body.play #play { display: flex; }
+/* 网页开玩（?play=1，#43、#64）：底部只有一个状态球和一句情境提示。放在画面之外，不随 1600×900 缩放，手机上也按得到 */
+#dock { position: fixed; z-index: 6; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px));
+  display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+#dock > * { pointer-events: auto; }
+body.play #dock { display: flex; }
 body.play #conn { right: auto; left: 14px; }
-#play .heard { position: absolute; right: calc(100% + 12px); top: 50%; transform: translateY(-50%); white-space: nowrap;
-  max-width: calc(50vw - 110px); overflow: hidden; text-overflow: ellipsis; padding: 8px 12px; border-radius: 10px; background: var(--card);
-  border: 1px solid var(--line); font-size: 14px; color: var(--ink-2); opacity: 0; transition: opacity .3s; }
-#play .heard.show { opacity: 1; }
-@media (max-width: 720px) {
-  #play .heard { right: auto; left: 50%; top: auto; bottom: calc(100% + 8px); transform: translateX(-50%); max-width: calc(100vw - 32px); }
-}
+#coach { margin: 0; max-width: 100%; text-align: center; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+#coach:empty { display: none; }
+#coach.nudge { color: var(--accent-ink); animation: nudge .4s; }
+@keyframes nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+#play { position: relative; display: flex; align-items: center; justify-content: center; }
+/* 「你：…」回显：浮在提示和状态球上方，不挡住它们 */
+#dock .heard { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); max-width: 100%; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; padding: 8px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line);
+  box-shadow: 0 8px 20px -12px rgba(42, 54, 68, .35); font-size: 14px; color: var(--ink-2); opacity: 0; transition: opacity .3s; pointer-events: none; }
+#dock .heard.show { opacity: 1; }
+/* 状态球：开始游戏 / 直接说话（自动在听）/ 在听 / 在想 / 点一下打断 / 已暂停 */
 #talk { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px 0 18px; border: 0; border-radius: 999px;
-  background: var(--solid); color: #fff; font: 700 17px var(--sans); cursor: pointer; touch-action: none; user-select: none;
+  background: var(--solid); color: #fff; font: 700 17px var(--sans); white-space: nowrap; cursor: pointer; touch-action: none; user-select: none;
   -webkit-user-select: none; -webkit-touch-callout: none; box-shadow: 0 6px 18px rgba(42, 54, 68, .18); transition: transform .12s, background .2s; }
-#cluesBtn { min-height: 52px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
-  color: var(--ink); font: 700 16px var(--sans); cursor: pointer; }
-#cluesBtn[aria-expanded="true"] { background: var(--tint); color: var(--accent-ink); border-color: var(--solid); }
-#clues { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 110px); overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(42, 54, 68, .16); }
-#clues[hidden] { display: none; }
-#clues .pline { display: none; padding: 4px 4px 8px; font-size: 16px; line-height: 1.7; }
-#clues .pline b { margin-right: 6px; color: var(--accent-ink); }
-#clueList { display: flex; flex-direction: column; gap: 10px; }
-/* 手机竖屏：画布缩得很小，字幕和线索卡固定放在画布下面，用正常字号显示 */
-body.portrait #clues, body.portrait #clues[hidden] { display: flex; left: 16px; right: 16px; bottom: 100px; width: auto; max-height: none;
-  transform: none; box-shadow: none; }
-body.portrait #clues .pline { display: block; }
-body.portrait #clues .pline:empty { display: none; }
-body.portrait #cluesBtn { display: none; }
-#clues .clue-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 12px; border-radius: 10px; background: var(--soft); }
-#clues .clue-row.used { opacity: .55; }
-/* 点卡出示（#59） */
-#clues .clue-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; }
-/* 线索卡插图（#63）：缩略图，左上角叠卡号 */
-#clues .no i { font-style: normal; }
-#clues .no.pic { position: relative; width: 72px; height: 72px; background-size: cover; background-position: center; }
-#clues .no.pic i { position: absolute; left: 4px; top: 4px; min-width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
-  background: rgba(42, 54, 68, .82); color: #fff; font: 700 13px var(--mono); }
-.evidence .no.pic { width: 168px; height: 168px; flex: none; background-size: cover; background-position: center; }
-#clues .present { align-self: center; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--solid); color: #fff;
-  font: 700 14px var(--sans); cursor: pointer; }
-#clues .pick { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 4px; font-size: 14px; color: var(--ink-3); }
-.chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
-  font: 500 14px var(--sans); cursor: pointer; }
-.chip:hover { border-color: var(--solid); }
-#sayline .chip { margin-left: 6px; padding: 4px 10px; font-size: 13px; }
-/* 窄屏：「点一下」的短语换行居中，不被裁掉 */
-@media (max-width: 720px) {
-  #sayline { white-space: normal; text-align: center; line-height: 2.2; bottom: 74px; }
-  body.portrait #clues, body.portrait #clues[hidden] { bottom: 140px; }
-  #clues .clue-row { grid-template-columns: auto minmax(0, 1fr); }
-  #clues .present { grid-column: 2; justify-self: start; }
-}
-/* 打字提问（#59） */
-.ask { display: flex; gap: 8px; }
-.ask input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: 15px var(--sans);
-  color: var(--ink); background: var(--soft); }
-.ask button { padding: 0 16px; border: 0; border-radius: 10px; background: var(--solid); color: #fff; font: 700 15px var(--sans); cursor: pointer; }
-#clues .no { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: var(--chip);
-  font: 700 18px var(--mono); }
-#clues b { display: block; margin-bottom: 4px; font-size: 16px; }
-#clues p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink-2); }
 #talk:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 3px; }
+#talk[data-state="off"] { min-height: 58px; padding: 0 30px 0 24px; font-size: 19px; animation: breathe 2.2s ease-in-out infinite; }
+#talk[data-state="ready"] { animation: breathe 2.6s ease-in-out infinite; }
 #talk[data-state="talking"] { transform: scale(1.06); background: var(--accent-ink); }
-#talk[data-state="connecting"], #talk[data-state="off"] { background: var(--ink-3); }
-#talk svg { flex: none; }
-#talk[data-state="talking"] svg { animation: pulse 1s ease-in-out infinite; }
+#talk[data-state="connecting"], #talk[data-state="paused"], #talk[data-state="idle"] { background: var(--ink-3); }
 #talk[data-state="thinking"] { background: var(--ink-3); }
 #talk[data-state="thinking"] #talkText { animation: pulse 1.2s ease-in-out infinite; }
 #talk[data-state="speaking"] { background: var(--ink-2); }
-/* 音量条（#56）：只在按住说话时显示 */
+#talk svg { flex: none; }
+#talk[data-state="talking"] svg { animation: pulse 1s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { box-shadow: 0 6px 18px rgba(42, 54, 68, .18), 0 0 0 0 rgba(217, 130, 91, .45); }
+  50% { box-shadow: 0 6px 18px rgba(42, 54, 68, .18), 0 0 0 12px rgba(217, 130, 91, 0); } }
+/* 音量条（#56）：等你说话时也在动，证明麦克风开着；在听时更亮 */
 .meter { display: none; align-items: center; gap: 3px; height: 22px; }
-#talk[data-state="talking"] .meter { display: flex; }
+#talk[data-state="talking"] .meter, #talk[data-state="ready"] .meter { display: flex; }
+#talk[data-state="ready"] .meter i { opacity: .55; }
 .meter i { width: 4px; height: 22px; border-radius: 2px; background: #fff; transform: scaleY(.2); transition: transform 60ms linear; }
-/* 「可以说」提示条（#56）：只是提示，不能点击，语音仍是唯一的输入 */
-#sayline { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); display: none; max-width: calc(100vw - 32px);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--ink-3); }
-body.play #sayline { display: block; }
-#sayline b { margin: 0 2px; font-weight: 500; color: var(--ink); }
 @keyframes pulse { 50% { opacity: .45; } }
+/* 打字提问：只在没有麦克风时出现 */
+.ask { display: flex; gap: 8px; width: 100%; }
+.ask[hidden] { display: none; }
+.ask input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: 15px var(--sans);
+  color: var(--ink); background: var(--card); }
+.ask button { padding: 0 16px; border: 0; border-radius: 10px; background: var(--solid); color: #fff; font: 700 15px var(--sans); cursor: pointer; }
+
+/* 出示（#64）：把卡拖到证词上，或者点卡再点证词。选中卡时还能反驳的证词亮起来 */
+.clue .th { flex: none; width: 44px; height: 44px; margin: -4px 0; border-radius: 8px; background: var(--chip) center / cover; }
+body.play [data-card] { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+body.play .clue[data-card] { touch-action: none; transition: transform .15s, box-shadow .15s; }
+[data-card].armed { transform: translateY(-6px); box-shadow: 0 0 0 2px var(--solid), 0 12px 22px -12px rgba(42, 54, 68, .45); }
+[data-claim].target { cursor: pointer; box-shadow: inset 0 0 0 2px var(--solid); animation: glow 1.4s ease-in-out infinite; }
+[data-claim].hover { background: var(--tint); }
+[data-claim].pending { animation: pulse 1s ease-in-out infinite; }
+@keyframes glow { 50% { box-shadow: inset 0 0 0 2px var(--solid), 0 0 0 6px rgba(217, 130, 91, .2); } }
+#ghost { position: fixed; z-index: 20; width: 88px; height: 88px; margin: -44px 0 0 -44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--chip) center / cover; font: 700 30px var(--mono); color: var(--ink-2); pointer-events: none; transform: rotate(-4deg);
+  box-shadow: 0 0 0 2px var(--solid), 0 16px 32px -12px rgba(42, 54, 68, .55); }
+#inspect { position: fixed; left: 50%; transform: translateX(-50%); z-index: 5; width: min(520px, calc(100vw - 32px));
+  display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 34px -14px rgba(42, 54, 68, .35); }
+#inspect[hidden] { display: none; }
+#inspect .th { width: 104px; height: 104px; border-radius: 10px; display: grid; place-items: center; background: var(--chip) center / cover;
+  font: 700 30px var(--mono); color: var(--ink-2); }
+#inspect b { display: block; margin-bottom: 4px; font-size: 16px; }
+#inspect p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+.evidence .no.pic { width: 168px; height: 168px; flex: none; background-size: cover; background-position: center; }
+
+/* 手机竖屏：画布缩得很小，台词、证词和手牌放在画布下面的审讯桌上，用正常字号显示 */
+#desk { position: fixed; left: 16px; right: 16px; display: none; flex-direction: column; gap: 12px; padding: 14px; overflow: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+body.play.portrait #desk { display: flex; }
+#desk .pline { margin: 0; font-size: 16px; line-height: 1.7; }
+#desk .pline:empty { display: none; }
+#desk .pline b { margin-right: 6px; color: var(--accent-ink); }
+#pClaims { display: flex; flex-direction: column; gap: 8px; }
+#pClaims:empty { display: none; }
+.pclaim { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px;
+  background: var(--soft); transition: background .2s; }
+.pclaim i { font: 700 13px var(--mono); font-style: normal; color: var(--ink-3); white-space: nowrap; }
+.pclaim p { margin: 0; font-size: 15px; line-height: 1.55; }
+.pclaim.broken p { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--solid); }
+.pclaim em { grid-column: 2; font-size: 12px; font-style: normal; color: var(--accent-ink); }
+#hand { display: flex; gap: 10px; overflow-x: auto; padding: 8px 2px 4px; }
+.hcard { flex: none; width: 88px; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: var(--soft);
+  border: 1px solid var(--line); font-size: 12px; line-height: 1.35; touch-action: pan-x; transition: transform .15s, box-shadow .15s; }
+.hcard .th { position: relative; width: 100%; aspect-ratio: 1; border-radius: 7px; display: grid; place-items: center;
+  background: var(--chip) center / cover; font: 700 22px var(--mono); color: var(--ink-2); }
+.hcard .th i { position: absolute; left: 4px; top: 4px; min-width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center;
+  background: rgba(42, 54, 68, .82); color: #fff; font: 700 12px var(--mono); font-style: normal; }
+.hcard.used { opacity: .5; }
+#desk #inspect { position: static; transform: none; width: auto; grid-template-columns: 88px minmax(0, 1fr); box-shadow: none;
+  background: var(--soft); border: 0; }
+#desk #inspect .th { width: 88px; height: 88px; }
+
+/* 反馈（#64）：戳破时屏幕一震、一闪；出示错了边缘闪红、律师计数抖一下；嫌疑人表情随心理防线变化 */
+#flash { position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0; }
+#flash.hit { background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, .9), rgba(255, 255, 255, 0) 70%); animation: flash .5s ease-out; }
+#flash.bad { box-shadow: inset 0 0 140px 40px rgba(196, 64, 40, .5); animation: flash .8s ease-out; }
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+#viewport.shake { animation: shake .45s cubic-bezier(.36, .07, .19, .97); }
+.pips.hit { animation: shake .5s; }
+@keyframes shake { 10%, 90% { transform: translate(-2px, 0); } 20%, 80% { transform: translate(4px, 1px); }
+  30%, 50%, 70% { transform: translate(-8px, -2px); } 40%, 60% { transform: translate(8px, 2px); } }
+.mug .avatar.photo { width: 300px; height: 300px; border-radius: 18px; }
+.mug .avatar.jolt { animation: jolt .5s; }
+@keyframes jolt { 30% { transform: scale(1.05) rotate(-1.5deg); } 60% { transform: scale(.98) rotate(1deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #viewport.shake, .pips.hit, .mug .avatar.jolt, #talk, [data-claim].target, .scene.active .moment h1 { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -300,12 +328,12 @@ body.play #sayline { display: block; }
           <span class="label" style="color: inherit" data-hint="say">对设备说</span>
           <div class="big">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-            「开始审讯」
+            <span data-hint="big">「开始审讯」</span>
           </div>
         </div>
         <ol class="card rules">
           <li><span>01</span>随便提问，听出证词里的破绽。</li>
-          <li><span>02</span>拍出线索卡，说「用 X 号卡反驳证词 Y」。</li>
+          <li><span>02</span><span style="font-family: inherit; font-weight: 400; color: inherit" data-hint="present">拍出线索卡，说「用 X 号卡反驳证词 Y」。</span></li>
           <li><span>03</span><span style="font-family: inherit; font-weight: 400; color: inherit" data-bind="rulesLine">出示错三次，或超过十五分钟，律师就到了。</span></li>
         </ol>
       </div>
@@ -345,7 +373,7 @@ body.play #sayline { display: block; }
     <footer class="card subtitle">
       <span class="speaker" id="speaker">旁白</span>
       <p id="lineText" data-hint="line">对设备说话开始审讯。</p>
-      <span class="small" style="white-space: nowrap">出示：「用 X 号卡反驳证词 Y」</span>
+      <span class="small" style="white-space: nowrap" data-hint="presentShort">出示：「用 X 号卡反驳证词 Y」</span>
     </footer>
     <div class="toast" id="toast" role="status"></div>
   </section>
@@ -355,7 +383,7 @@ body.play #sayline { display: block; }
     <header class="brandrow"><span class="brand">破绽</span><span class="tag">CASE 01</span><span class="case-title" data-bind="title"></span></header>
     <div class="moment">
       <span class="chip" id="mClaim">证词 01</span>
-      <h1>被戳破了</h1>
+      <h1>破绽！</h1>
       <p class="was" id="mWas"></p>
       <div class="card evidence"><span class="no" id="mCard">2</span><div><b id="mCardTitle"></b><span id="mCardText"></span></div></div>
     </div>
@@ -392,19 +420,24 @@ body.play #sayline { display: block; }
 </div>
 </div>
 <div id="conn" role="status"><i></i><span>正在重新连接…</span></div>
-<div id="clues" hidden aria-label="线索卡">
-  <form id="askForm" class="ask"><input id="askInput" maxlength="100" autocomplete="off" placeholder="也可以打字，比如：你那天晚上去哪了？" aria-label="打字提问"><button type="submit">发送</button></form>
-  <p class="pline" id="pline" aria-live="polite"></p><div id="clueList"></div>
+<div id="desk" aria-label="审讯桌">
+  <p class="pline" id="pline" aria-live="polite"></p>
+  <div id="pClaims" aria-label="证词"></div>
+  <div id="hand" aria-label="线索卡"></div>
 </div>
-<div id="sayline" aria-live="polite"></div>
-<div id="play">
+<div id="inspect" hidden aria-live="polite"></div>
+<div id="flash" aria-hidden="true"></div>
+<div id="dock">
   <div class="heard" id="heard" role="status"></div>
-  <button id="cluesBtn" type="button" aria-expanded="false" aria-controls="clues">线索卡</button>
-  <button id="talk" type="button" data-state="idle">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    <span id="talkText">开始游戏</span>
-    <span class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
-  </button>
+  <p id="coach" aria-live="polite"></p>
+  <form id="askForm" class="ask" hidden><input id="askInput" maxlength="100" autocomplete="off" placeholder="打字问他，比如：你那天晚上去哪了？" aria-label="打字提问"><button type="submit">发送</button></form>
+  <div id="play">
+    <button id="talk" type="button" data-state="off">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span id="talkText">开始游戏</span>
+      <span class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    </button>
+  </div>
 </div>
 
 <script>
@@ -427,19 +460,26 @@ body.play #sayline { display: block; }
   const mmss = (s) => `${pad(Math.floor(Math.max(0, s) / 60))}:${pad(Math.floor(Math.max(0, s) % 60))}`;
 
   // 按 1600×900 等比缩放到视口
-  const DOCK = 104;  // 网页开玩时底部留给「可以说」和「按住说话」的高度
   const fit = () => {
-    const reserve = document.body.classList.contains("play") ? DOCK : 0;
+    const play = document.body.classList.contains("play");
+    const reserve = play ? $("dock").offsetHeight + 22 : 0;  // 网页开玩时底部留给提示和状态球
     const vp = $("viewport");
-    const portrait = reserve > 0 && vp.clientHeight > vp.clientWidth * 1.2;
+    const portrait = play && vp.clientHeight > vp.clientWidth * 1.2;
     document.body.classList.toggle("portrait", portrait);
     const s = Math.min(vp.clientWidth / 1600, (vp.clientHeight - reserve) / 900);
-    // 竖屏时画布贴顶，下面留给字幕和线索卡
+    // 竖屏时画布贴顶，下面是审讯桌
     $("stage").style.top = portrait ? `${12 + 450 * s}px` : `${(vp.clientHeight - reserve) / 2}px`;
-    $("clues").style.top = portrait ? `${24 + 900 * s}px` : "";
+    $("desk").style.top = portrait ? `${24 + 900 * s}px` : "";
+    $("desk").style.maxHeight = portrait ? `${vp.clientHeight - reserve - 36 - 900 * s}px` : "";  // 按内容高度，放不下再滚动
+    // 选中卡的详情：竖屏放进审讯桌，横屏浮在状态球上方
+    const inspect = $("inspect");
+    if (portrait && inspect.parentNode !== $("desk")) $("desk").append(inspect);
+    if (!portrait && inspect.parentNode !== document.body) document.body.append(inspect);
+    inspect.style.bottom = portrait ? "" : `${reserve + 4}px`;
     $("stage").style.transform = `translate(-50%, -50%) scale(${s})`;
   };
   addEventListener("resize", fit);
+  new ResizeObserver(fit).observe($("dock"));  // 提示变成两行、出现打字框时重新排版
   fit();
 
   let snap = null;
@@ -473,25 +513,57 @@ body.play #sayline { display: block; }
     cover.src = base + "cover.jpg";
     const avatars = [...document.querySelectorAll(".avatar")];
     avatars.forEach((a) => { a.classList.remove("photo"); a.style.backgroundImage = ""; });
+    moods.clear();
+    shownMood = null;
     const img = new Image();
     img.onload = () => {
       if (artCase !== caseId) return;
+      moods.set("calm", img.src);
       avatars.forEach((a) => { a.classList.add("photo"); a.style.backgroundImage = `url("${img.src}")`; });
+      renderMood();
     };
     img.src = base + "suspect.jpg";
+    // 嫌疑人表情（#64）：慌张、崩溃两张，取不到就一直用原立绘
+    for (const mood of ["nervous", "broken"]) {
+      const m = new Image();
+      m.onload = () => {
+        if (artCase !== caseId) return;
+        moods.set(mood, m.src);
+        renderMood();
+      };
+      m.src = base + `suspect-${mood}.jpg`;
+    }
     // 线索卡插图（#63）：加载成功的才显示，取不到就保持纯文字
     for (const card of (snap && snap.cards) || []) {
       const p = new Image();
       p.onload = () => {
         if (artCase !== caseId) return;
         cardArt.set(card.id, p.src);
-        renderClues();
+        renderCards();
+        renderDesk();
+        renderTargets();
       };
       p.src = base + `card-${card.id}.jpg`;
     }
   }
   const cardArt = new Map();  // 当前案子已加载的线索卡插图：卡号 → 地址
   const cardPic = (id) => cardArt.get(id) || null;
+  const moods = new Map();      // 已加载的嫌疑人表情：calm / nervous / broken → 地址
+  let shownMood = null;
+
+  // 心理防线第一档镇定，最后一档（或认罪）崩溃，中间慌张；换表情时立绘抖一下
+  function renderMood() {
+    if (!snap || !snap.stages) return;
+    const n = snap.stages.length, i = snap.stage.index;
+    const want = (snap.result && snap.result.won) || i >= n - 1 ? "broken" : i > 0 ? "nervous" : "calm";
+    const mood = moods.has(want) ? want : want === "broken" && moods.has("nervous") ? "nervous" : "calm";
+    const url = moods.get(mood);
+    const a = document.querySelector(".mug .avatar");
+    if (!url || !a) return;
+    a.style.backgroundImage = `url("${url}")`;
+    if (shownMood && shownMood !== mood) { a.classList.remove("jolt"); void a.offsetWidth; a.classList.add("jolt"); }
+    shownMood = mood;
+  }
 
   function renderCommon() {
     const c = snap.case;
@@ -522,6 +594,7 @@ body.play #sayline { display: block; }
     $("claimList").classList.toggle("dense", snap.claims.length > 3);
     $("claimList").replaceChildren(...snap.claims.map((c) => {
       const row = el("article", "card claim" + (c.status === "broken" ? " broken" : "") + (isNew(c) ? " fresh" : ""));
+      row.dataset.claim = c.id;
       const no = el("span", "no");
       no.append(el("small", null, "证词"), el("span", null, pad(c.id)));
       const body = el("div");
@@ -539,16 +612,29 @@ body.play #sayline { display: block; }
     }));
     seenClaims = new Set(snap.claims.map((c) => c.id));
 
-    $("cardList").replaceChildren(...snap.cards.map((card) => {
-      const n = el("span", "clue" + (card.used ? " used" : ""));
-      n.append(el("b", null, String(card.id)), document.createTextNode(card.used ? `${card.title} · 已用` : card.title));
-      return n;
-    }));
+    renderCards();
 
     const line = snap.line;
     $("speaker").textContent = line ? speakerName(line) : "旁白";
     $("speaker").className = "speaker" + (line && line.speaker === "suspect" ? "" : " narrator");
     $("lineText").textContent = line ? line.text : "随便提问，或者拍出线索卡反驳证词。";
+  }
+
+  // 审讯页底部的线索条：网页开玩时就是手牌，可以拖到证词上（#64）
+  function renderCards() {
+    if (!snap || !snap.claims) return;
+    $("cardList").replaceChildren(...snap.cards.map((card) => {
+      const n = el("span", "clue" + (card.used ? " used" : ""));
+      n.dataset.card = card.id;
+      const pic = cardPic(card.id);
+      if (pic) {
+        const th = el("span", "th");
+        th.style.backgroundImage = `url("${pic}")`;
+        n.append(th);
+      }
+      n.append(el("b", null, String(card.id)), document.createTextNode(card.used ? `${card.title} · 已用` : card.title));
+      return n;
+    }));
   }
 
   function renderMoment(ev) {
@@ -623,50 +709,187 @@ body.play #sayline { display: block; }
     return snap.scene;
   }
 
-  // 网页开玩时的线索卡面板：网页玩家手里没有打印出来的卡
-  function renderClues() {
-    if (!snap.cards) return;
+  // ---- 网页开玩：审讯桌（竖屏）、出示和情境提示（#64） ----
+  const isPlay = () => document.body.classList.contains("play");
+  let picked = null;            // 选中的线索卡：看详情，能出示时拖或点到证词上
+  let pendingClaim = null;      // 刚出示过的证词：等结果时闪一闪
+  let drag = null;
+
+  // 竖屏的审讯桌：台词、证词、横向手牌。横屏时这些都在画布上
+  function renderDesk() {
+    if (!isPlay() || !snap) return;
     const line = snap.line;
     const pline = $("pline");
     pline.replaceChildren();
     if (line && line.text) pline.append(el("b", null, speakerName(line)), document.createTextNode(line.text));
-    $("clueList").replaceChildren(...snap.cards.map((card) => {
-      const row = el("div", "clue-row" + (card.used ? " used" : ""));
-      const body = el("div");
-      body.append(el("b", null, card.used ? `${card.title} · 已用` : card.title), el("p", null, card.text || ""));
-      const no = el("span", "no");
-      no.append(el("i", null, String(card.id)));
-      const pic = cardPic(card.id);
-      if (pic) { no.classList.add("pic"); no.style.backgroundImage = `url("${pic}")`; }
-      row.append(no, body);
-      const holding = (snap.claims || []).filter((c) => c.status === "holding");
-      if (sendText && holding.length && chooseScene() === "interrogating") {
-        // 点卡出示（#59）：选好证词就替玩家说「用 N 号卡反驳证词 M」
-        const btn = el("button", "present", presenting === card.id ? "取消" : "出示");
-        btn.type = "button";
-        btn.addEventListener("click", () => { presenting = presenting === card.id ? null : card.id; renderClues(); });
-        row.append(btn);
-        if (presenting === card.id) {
-          const pick = el("div", "pick");
-          pick.append(el("span", null, "反驳哪条证词？"));
-          for (const c of holding) {
-            const short = c.text.length > 14 ? c.text.slice(0, 14) + "…" : c.text;
-            const b = el("button", "chip", `证词${cn(c.id)}：${short}`);
-            b.type = "button";
-            b.addEventListener("click", () => {
-              presenting = null;
-              $("clues").hidden = true;
-              $("cluesBtn").setAttribute("aria-expanded", "false");
-              sendText(`用${cn(card.id)}号卡反驳证词${cn(c.id)}`);
-              renderClues();
-            });
-            pick.append(b);
-          }
-          row.append(pick);
-        }
-      }
+    $("pClaims").replaceChildren(...(snap.claims || []).map((c) => {
+      const row = el("div", "pclaim" + (c.status === "broken" ? " broken" : ""));
+      row.dataset.claim = c.id;
+      row.append(el("i", null, `证词${pad(c.id)}`), el("p", null, c.text));
+      if (c.brokenBy) row.append(el("em", null, `已被 ${c.brokenBy.card} 号卡戳破`));
       return row;
     }));
+    const hand = $("hand"), x = hand.scrollLeft;
+    hand.replaceChildren(...snap.cards.map((card) => {
+      const n = el("div", "hcard" + (card.used ? " used" : ""));
+      n.dataset.card = card.id;
+      const pic = cardPic(card.id);
+      const th = el("span", "th", pic ? null : String(card.id));
+      if (pic) { th.style.backgroundImage = `url("${pic}")`; th.append(el("i", null, String(card.id))); }
+      n.append(th, el("span", null, card.title));
+      return n;
+    }));
+    hand.scrollLeft = x;
+  }
+
+  const holdingIds = () => new Set(((snap && snap.claims) || []).filter((c) => c.status === "holding").map((c) => c.id));
+  const canPresent = () => !!(sendText && snap && snap.claims && chooseScene() === "interrogating" && holdingIds().size);
+
+  // 选中的卡高亮、能反驳的证词亮起来、详情和提示跟着变
+  function renderTargets() {
+    const live = canPresent();
+    const holding = holdingIds();
+    for (const n of document.querySelectorAll("[data-card]")) n.classList.toggle("armed", Number(n.dataset.card) === picked);
+    for (const n of document.querySelectorAll("[data-claim]")) {
+      const id = Number(n.dataset.claim);
+      n.classList.toggle("target", live && picked !== null && holding.has(id));
+      n.classList.toggle("pending", id === pendingClaim);
+    }
+    const box = $("inspect");
+    const card = picked !== null && snap && snap.cards.find((c) => c.id === picked);
+    box.hidden = !card;
+    if (card) {
+      const pic = cardPic(card.id);
+      const th = el("span", "th", pic ? null : String(card.id));
+      if (pic) th.style.backgroundImage = `url("${pic}")`;
+      const body = el("div");
+      body.append(el("b", null, `${cn(card.id)}号卡 · ${card.title}`), el("p", null, card.text || ""));
+      box.replaceChildren(th, body);
+    }
+    renderCoach();
+  }
+
+  // 出示：替玩家说「用 N 号卡反驳证词 M」，嫌疑人照样用情感音色回答
+  function presentTo(claimId) {
+    const card = picked;
+    if (card === null || !canPresent()) return;
+    picked = null;
+    pendingClaim = claimId;
+    setTimeout(() => { if (pendingClaim === claimId) { pendingClaim = null; renderTargets(); } }, 15000);
+    sendText(`用${cn(card)}号卡反驳证词${cn(claimId)}`);
+    renderTargets();
+  }
+
+  const claimAt = (x, y) => {
+    const n = document.elementFromPoint(x, y);
+    const t = n && n.closest("[data-claim]");
+    return t && t.classList.contains("target") ? t : null;
+  };
+  // 按住卡往外拖就是出示；没拖动就是点选。手牌横向滑动时不算拖卡
+  addEventListener("pointerdown", (e) => {
+    if (!isPlay() || e.button > 0) return;
+    const c = e.target.closest("[data-card]");
+    if (c) drag = { id: Number(c.dataset.card), x: e.clientX, y: e.clientY, moved: false, inHand: !!c.closest("#hand"), over: null };
+  });
+  addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 10) return;
+      if ((drag.inHand && Math.abs(dx) > Math.abs(dy)) || !canPresent()) { drag = null; return; }
+      drag.moved = true;
+      picked = drag.id;
+      const pic = cardPic(drag.id);
+      const g = el("div", null, pic ? null : String(drag.id));
+      g.id = "ghost";
+      if (pic) g.style.backgroundImage = `url("${pic}")`;
+      document.body.append(g);
+      renderTargets();
+    }
+    e.preventDefault();
+    const g = $("ghost");
+    g.style.left = `${e.clientX}px`;
+    g.style.top = `${e.clientY}px`;
+    const t = claimAt(e.clientX, e.clientY);
+    if (t !== drag.over) {
+      if (drag.over) drag.over.classList.remove("hover");
+      if (t) t.classList.add("hover");
+      drag.over = t;
+    }
+  }, { passive: false });
+  const endDrag = () => {
+    const g = $("ghost");
+    if (g) g.remove();
+    if (drag && drag.over) drag.over.classList.remove("hover");
+    drag = null;
+  };
+  addEventListener("pointerup", (e) => {
+    if (!drag) return;
+    const d = drag;
+    endDrag();
+    if (!d.moved) { picked = picked === d.id ? null : d.id; renderTargets(); return; }
+    const t = claimAt(e.clientX, e.clientY);
+    if (t) presentTo(Number(t.dataset.claim));
+    else renderTargets();
+  });
+  addEventListener("pointercancel", endDrag);
+  addEventListener("click", (e) => {
+    if (!isPlay() || e.target.closest("[data-card], #inspect, #dock")) return;
+    const t = e.target.closest("[data-claim]");
+    if (t && t.classList.contains("target")) { presentTo(Number(t.dataset.claim)); return; }
+    if (t && picked === null && canPresent() && holdingIds().has(Number(t.dataset.claim))) {
+      coachNudge(document.body.classList.contains("portrait") ? "先点一张线索卡，再点这条证词" : "把线索卡拖到这条证词上");
+      return;
+    }
+    if (picked !== null) { picked = null; renderTargets(); }
+  });
+
+  // 情境提示：底部只有一句话，按局面变化；学会出示之后不再教（#64）
+  let coachOverride = null, coachTimer = 0, lastProgress = Date.now(), progressKey = "";
+  const learned = (k) => { try { return localStorage.getItem(`pozhan.learned.${k}`) === "1"; } catch { return false; } };
+  const learn = (k) => { try { localStorage.setItem(`pozhan.learned.${k}`, "1"); } catch {} };
+  function coachText() {
+    if (!sendText || !snap) return "";
+    const scene = chooseScene();
+    const portrait = document.body.classList.contains("portrait");
+    if (picked !== null && canPresent()) return portrait ? "点一下要反驳的那条证词" : "拖到要反驳的证词上，或者点一下那条证词";
+    if (!voice.connected) return "";  // 还没开局：只有「开始游戏」一个动作
+    if (scene === "ended") return voice.mic ? "说「讲讲真相」听复盘，或者「下一个案子」" : "打「讲讲真相」听复盘，或者「下一个案子」";
+    if (scene !== "interrogating") return "";
+    if (!snap.claims.length) return voice.mic ? "直接开口问他，比如「你当时在干什么？」" : "打字问他，比如「你当时在干什么？」";
+    if (!learned("present") && canPresent()) {
+      return portrait ? "哪句和线索卡对不上？点那张卡，再点那条证词" : "哪句和线索卡对不上？把那张卡拖到证词上";
+    }
+    if (Date.now() - lastProgress > 75000) return voice.mic ? "卡住了？说「给点提示」" : "卡住了？打「给点提示」";
+    return "";
+  }
+  function renderCoach() {
+    const c = $("coach");
+    const text = coachOverride || coachText();
+    if (c.textContent !== text) c.textContent = text;
+  }
+  function coachNudge(text) {
+    const c = $("coach");
+    coachOverride = text;
+    renderCoach();
+    c.classList.remove("nudge");
+    void c.offsetWidth;
+    c.classList.add("nudge");
+    clearTimeout(coachTimer);
+    coachTimer = setTimeout(() => { coachOverride = null; c.classList.remove("nudge"); renderCoach(); }, 3000);
+  }
+  setInterval(renderCoach, 3000);
+
+  // 戳破：一震一闪；出示错了：边缘闪红、律师计数抖一下（#64）
+  function juice(kind) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const f = $("flash");
+    f.className = "";
+    void f.offsetWidth;
+    f.className = kind;
+    const kick = (node, cls) => { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); };
+    if (kind === "hit") setTimeout(() => kick($("viewport"), "shake"), 120);  // 和「破绽！」盖章落下的时间对齐
+    if (kind === "bad") kick($("pips"), "hit");
   }
 
   function apply(next) {
@@ -674,20 +897,22 @@ body.play #sayline { display: block; }
     snap = next;
     clockOffset = snap.serverNow - Date.now() / 1000;
     renderCommon();
-    renderClues();
     if (snap.claims) renderInterrogation();
     if (snap.result) renderEnded();
-    renderSay();
-    if (onSnap) onSnap();
+    const key = snap.claims ? `${snap.claims.length}/${snap.claims.filter((c) => c.status === "broken").length}` : "";
+    if (key !== progressKey) { progressKey = key; lastProgress = Date.now(); }
 
     // 只播放页面打开之后发生的事件：刷新或重连时不重放旧的「戳破瞬间」
     const ev = snap.event;
     if (ev && ev.id !== lastEventId) {
       lastEventId = ev.id;
+      pendingClaim = null;
       if (!first && (ev.kind === "broke" || ev.kind === "confession")) {
         renderMoment(ev);
         momentUntil = Date.now() + 3000;
-        setTimeout(() => show(chooseScene()), 3050);
+        setTimeout(() => { show(chooseScene()); renderTargets(); }, 3050);
+        juice("hit");
+        if (isPlay() && ev.kind === "broke") learn("present");
       }
       if (!first) sfx(ev.kind);
       if (!first && ev.kind === "weak") {
@@ -695,47 +920,26 @@ body.play #sayline { display: block; }
       } else if (!first && ev.kind === "revealed") {
         toast([document.createTextNode("新证词 "), el("b", null, pad(ev.claim)), document.createTextNode(`：${ev.claimText}`)]);
       } else if (!first && ev.kind === "wrong") {
+        juice("bad");
         toast([document.createTextNode(`这张卡驳不倒证词${cn(ev.claim)} · 律师还差 `), el("b", null, String(ev.strikesLeft)), document.createTextNode(" 次")]);
       }
     }
     // ?preview=broke：把最近一次戳破定格在屏幕上，供截图和排版检查使用
     if (params.get("preview") === "broke" && ev && ev.kind === "broke") momentUntil = Infinity;
     if (Date.now() < momentUntil && ev && (ev.kind === "broke" || ev.kind === "confession")) renderMoment(ev);
+    renderMood();
+    renderDesk();
+    renderTargets();
+    if (onSnap) onSnap();
     show(chooseScene());
     tick();
-  }
-
-  // 「可以说」：按场景给两三句能直接说的话（#56）
-  function renderSay() {
-    const say = $("sayline");
-    if (!say) return;
-    const scene = snap ? chooseScene() : "briefing";
-    const phrases = scene === "ended" ? ["讲讲真相", "下一个案子", "重新开始"]
-      : scene === "briefing" ? ["开始审讯", "有哪些案子"]
-      : ["念一下证词", "给点提示", "用 X 号卡反驳证词 Y"];
-    if (!sendText) {
-      say.replaceChildren(document.createTextNode("可以说："), ...phrases.map((p) => el("b", null, `「${p}」`)));
-      return;
-    }
-    // 网页开玩：点一下就说这句（#59）；出示句式改成打开线索卡面板
-    say.replaceChildren(el("span", null, "点一下："), ...phrases.map((p) => {
-      const present = p.startsWith("用 X");
-      const b = el("button", "chip", present ? "出示线索卡" : p);
-      b.type = "button";
-      b.addEventListener("click", () => {
-        if (!present) { sendText(p); return; }
-        $("clues").hidden = false;
-        $("cluesBtn").setAttribute("aria-expanded", "true");
-      });
-      return b;
-    }));
   }
 
   // 音效（#56）：WebAudio 现场合成，不需要素材文件。网页开玩默认开启；陪玩屏加 &sfx=1 才开启，避免和设备的声音打架
   let sfxCtx = null;
   let sendText = null;          // 网页开玩时把一句话交给灵矽（#59）；陪玩屏只看不玩，为 null
-  let presenting = null;        // 正在为哪张卡选证词（线索卡面板里的「出示」）
   let onSnap = null;            // 网页开玩：每次收到新快照后刷新按钮文字
+  const voice = { connected: false, mic: false };  // 网页开玩：连上灵矽了没有、麦克风能不能用
   if (params.get("sfx") === "1") {
     addEventListener("pointerdown", () => { sfxCtx = sfxCtx || new AudioContext(); }, { once: true });
   }
@@ -822,14 +1026,16 @@ body.play #sayline { display: block; }
   // 灵矽的语音由服务端解码成 PCM 发回来，这里按顺序排队播放。
   const WORKLET = `
     class Mic extends AudioWorkletProcessor {
-      constructor() { super(); this.step = sampleRate / 16000; this.pos = 0; this.out = new Int16Array(960); this.n = 0; this.sq = 0; }
+      constructor() { super(); this.step = sampleRate / 16000; this.pos = 0; this.prev = 0; this.out = new Int16Array(960); this.n = 0; this.sq = 0; }
       process(inputs) {
         const x = inputs[0] && inputs[0][0];
         if (!x) return true;
-        // 线性插值降采样到 16k，凑满 60ms（960 个采样）发一次
+        // 线性插值降采样到 16k，凑满 60ms（960 个采样）发一次。
+        // 读取位置可能落在上一块最后一个采样和这一块第一个之间（pos 为负），这时用上一块留下的采样，不能读 x[-1]
+        const at = (k) => (k < 0 ? this.prev : x[k]);
         for (; this.pos < x.length - 1; this.pos += this.step) {
           const i = Math.floor(this.pos), f = this.pos - i;
-          const v = Math.max(-1, Math.min(1, x[i] * (1 - f) + x[i + 1] * f));
+          const v = Math.max(-1, Math.min(1, at(i) * (1 - f) + at(i + 1) * f));
           this.out[this.n++] = v < 0 ? v * 0x8000 : v * 0x7fff;
           this.sq += v * v;
           if (this.n === this.out.length) {
@@ -838,6 +1044,7 @@ body.play #sayline { display: block; }
             this.n = 0; this.sq = 0;
           }
         }
+        this.prev = x[x.length - 1];
         this.pos -= x.length;
         return true;
       }
@@ -850,10 +1057,16 @@ body.play #sayline { display: block; }
     const q = new URLSearchParams();
     if (params.get("token")) q.set("token", params.get("token"));
     const talk = $("talk"), talkText = $("talkText"), heard = $("heard");
-    const setState = (state, text) => { talk.dataset.state = state; talkText.textContent = text; };
-    for (const n of document.querySelectorAll('[data-hint="say"]')) n.textContent = "点一下按钮说";
-    for (const n of document.querySelectorAll('[data-hint="line"]')) n.textContent = "点底部「开始游戏」，案子马上开始。";
-    for (const n of document.querySelectorAll('[data-hint="again"]')) n.textContent = "点一下说";
+    const setState = (state, text) => { talk.dataset.state = state; talkText.textContent = text; renderCoach(); };
+    const hints = {
+      say: "点「开始游戏」之后",
+      big: "直接开口说话",
+      line: "点底部「开始游戏」，案子马上开始。",
+      present: "看出哪句不对，就把线索卡拖到那条证词上。",
+      presentShort: "出示：把线索卡拖到证词上",
+      again: "直接说",
+    };
+    for (const [k, v] of Object.entries(hints)) for (const n of document.querySelectorAll(`[data-hint="${k}"]`)) n.textContent = v;
 
     let heardTimer = 0;
     const say = (text, ms = 4000) => {
@@ -863,7 +1076,6 @@ body.play #sayline { display: block; }
       heardTimer = setTimeout(() => heard.classList.remove("show"), ms);
     };
     const suspectName = () => (snap && snap.case ? snap.case.suspect.name : "嫌疑人");
-    const IDLE = "点一下说话";
 
     // 音量条：说话时随音量起伏，证明麦克风在收音（#56）
     const bars = [...document.querySelectorAll("#meter i")];
@@ -872,11 +1084,15 @@ body.play #sayline { display: block; }
       bars.forEach((b, i) => { b.style.transform = `scaleY(${i < lit ? 0.35 + 0.65 * ((i + 1) / bars.length) : 0.2})`; });
     };
 
+    // 轮流说（#64）：对方一说完就自动等你开口，本地听到人声才开始一轮，说完由灵矽判断。
+    // 只在对方说完之后才听，外放的声音不会被当成玩家说的话。
     let ctx = null, mic = null, ws = null, ready = false, outRate = 24000;
-    let listening = false, pressAt = 0, listenTimer = 0, thinkingSince = 0, connected = false;
-    let playAt = 0;
+    let listening = false, holding = false, spoke = false, sttSeen = false, ttsOn = false, paused = false;
+    let pressAt = 0, listenTimer = 0, sttTimer = 0, thinkingSince = 0, readySince = 0, quietSince = 0;
+    let loud = 0, floor = 0.01, playAt = 0;
+    let preroll = [];               // 开口前的约 0.4 秒，免得吞掉第一个字
     const playing = new Set();
-    const stopPlayback = () => { for (const s of playing) { try { s.stop(); } catch {} } playing.clear(); playAt = 0; };
+    const stopPlayback = () => { for (const s of playing) { try { s.stop(); } catch {} } playing.clear(); playAt = 0; ttsOn = false; };
     const play = (buf) => {
       const pcm = new Int16Array(buf);
       if (!pcm.length) return;
@@ -886,19 +1102,31 @@ body.play #sayline { display: block; }
       const src = ctx.createBufferSource();
       src.buffer = ab;
       src.connect(ctx.destination);
-      if (!listening && (talk.dataset.state === "thinking" || talk.dataset.state === "idle")) setState("speaking", "点一下打断");
+      if (!listening && talk.dataset.state !== "speaking") setState("speaking", "点一下打断");
       playAt = Math.max(playAt, ctx.currentTime + 0.08);  // 留一点余量，网络抖动时不断音
       src.start(playAt);
       playAt += ab.duration;
       playing.add(src);
       src.onended = () => playing.delete(src);
     };
-    // 「在想」→「在说」→ 回到「点一下说话」：按播放进度切换（#56）
+
+    // 回到「等你说话」。没有麦克风时只能打字和拖卡；暂停或切到后台时先不听
+    const arm = () => {
+      clearTimeout(sttTimer);
+      if (!voice.mic) { setState("idle", "打开麦克风"); return; }
+      if (paused || document.hidden) { paused = true; meter(0); setState("paused", "已暂停 · 点一下继续"); return; }
+      preroll = [];
+      loud = 0;
+      readySince = Date.now();
+      setState("ready", "直接说话");
+    };
     setInterval(() => {
       const st = talk.dataset.state;
-      if (st === "thinking" && Date.now() - thinkingSince > 20000) setState("idle", IDLE);
-      if (st === "speaking" && ctx && ctx.currentTime > playAt + 0.3) setState("idle", IDLE);
-    }, 250);
+      if (st === "thinking" && Date.now() - thinkingSince > 20000) arm();
+      // 灵矽说「这一轮说完了」并且播完，才轮到玩家；收不到结束消息时，静默 8 秒也算说完
+      if (st === "speaking" && ctx && ctx.currentTime > playAt + (ttsOn ? 8 : 0.25)) { ttsOn = false; arm(); }
+      if (st === "ready" && Date.now() - readySince > 120000) { paused = true; arm(); }  // 两分钟没人说话就先关麦
+    }, 200);
 
     const send = (obj) => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); };
     const thinking = () => { thinkingSince = Date.now(); setState("thinking", `${suspectName()}在想…`); };
@@ -910,8 +1138,31 @@ body.play #sayline { display: block; }
       if (tellServer) send({ type: "stop" });
       thinking();
     };
+    // 开始一轮：auto 是本地听到人声自动开始，带上开口前的缓存；否则是玩家点了按钮
+    const beginTurn = (auto) => {
+      clearTimeout(sttTimer);
+      if (!ready || ws.readyState !== WebSocket.OPEN) { paused = true; arm(); return; }
+      stopPlayback();
+      listening = true;
+      spoke = auto;
+      sttSeen = false;
+      pressAt = Date.now();
+      send({ type: "start", mode: "auto" });
+      if (auto) for (const b of preroll) ws.send(b);
+      preroll = [];
+      quietSince = Date.now() + (auto ? 0 : 2500);  // 点了按钮再开口，多给两秒半
+      setState("talking", "在听…");
+      listenTimer = setTimeout(endTurn, 15000);  // 一直没停顿也别无限听下去
+    };
+    // 本地判断说完了（灵矽的断句通常更早到）：发出去；根本没开口就直接回到等你说话
+    const endTurn = () => {
+      if (!listening) return;
+      stopListening(true);
+      if (!spoke) { arm(); return; }
+      sttTimer = setTimeout(() => { if (!sttSeen && talk.dataset.state === "thinking") arm(); }, 4000);
+    };
 
-    // 连上服务端的中转；灵矽空闲久了会断开，下次操作时再连
+    // 连上服务端的中转；灵矽空闲久了会断开，之后点一下再连
     const open = () => new Promise((resolve, reject) => {
       const scheme = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${scheme}//${location.host}${base}voice?${q}`);
@@ -923,20 +1174,26 @@ body.play #sayline { display: block; }
         if (msg.type === "ready") { outRate = msg.sampleRate; ready = true; resolve(); }
         else if (msg.type === "busy") { say("已经有人在网页上玩了，稍后再试", 6000); reject(new Error("busy")); }
         else if (msg.type === "error") { say(msg.message, 6000); reject(new Error(msg.message)); }
+        else if (msg.type === "tts" && msg.state === "start") ttsOn = true;
+        else if (msg.type === "tts" && msg.state === "stop") ttsOn = false;
         else if (msg.type === "stt" && msg.text) {
-          // 灵矽听完了（自动判断说完，或者是点按、打字的回显）：停止收音，等他开口
+          // 灵矽听完了（自动断句，或者是拖卡、打字的回显）：停止收音，等他开口
+          sttSeen = true;
+          clearTimeout(sttTimer);
           if (listening) stopListening(false);
           say(`你：${msg.text.replace(/\s*\[[A-Za-z_]+的说\]\s*$/, "")}`);
         }
       };
       ws.onclose = () => {
+        const was = ready;
         ready = false;
-        if (listening) { listening = false; meter(0); setState("idle", IDLE); }
+        if (listening) { listening = false; clearTimeout(listenTimer); meter(0); }
+        if (was && voice.connected) { paused = true; arm(); }
         reject(new Error("closed"));
       };
     });
 
-    // 必须在用户点按时创建音频，浏览器才允许出声和开麦；没有麦克风也能用点按和打字玩（#59）
+    // 必须在用户点按时创建音频，浏览器才允许出声和开麦；没有麦克风也能打字和拖卡玩（#59）
     const ensure = async (withMic) => {
       if (!ctx) { ctx = new AudioContext(); sfxCtx = ctx; }
       if (ctx.state === "suspended") await ctx.resume();
@@ -948,19 +1205,32 @@ body.play #sayline { display: block; }
         await ctx.audioWorklet.addModule(url);
         mic = new AudioWorkletNode(ctx, "mic");
         mic.port.onmessage = (m) => {
+          const { buf, level } = m.data;
+          if (talk.dataset.state === "ready") {
+            // 等你说话：连续三帧（约 0.2 秒）明显高于底噪才算开口；底噪随环境慢慢调整
+            meter(level);
+            preroll.push(buf);
+            if (preroll.length > 7) preroll.shift();
+            if (level > Math.max(0.03, floor * 4)) loud++;
+            else { loud = 0; floor = floor * 0.95 + level * 0.05; }
+            if (loud >= 3) beginTurn(true);
+            return;
+          }
           if (!listening) return;
-          meter(m.data.level);
-          if (ready && ws.readyState === WebSocket.OPEN) ws.send(m.data.buf);
+          meter(level);
+          if (ready && ws.readyState === WebSocket.OPEN) ws.send(buf);
+          if (level > Math.max(0.02, floor * 3)) { quietSince = Date.now(); spoke = true; }
+          else if (!holding && Date.now() - quietSince > 1600) endTurn();
         };
         ctx.createMediaStreamSource(stream).connect(mic);
       }
       if (!ws || ws.readyState > WebSocket.OPEN || !ready) await open();
     };
 
-    // 点按操作和打字：作为一句话交给灵矽（#59），嫌疑人照样用情感音色回答
+    // 拖卡出示和打字：作为一句话交给灵矽（#59），嫌疑人照样用情感音色回答
     sendText = async (text) => {
-      try { await ensure(false); } catch { return; }
-      connected = true;
+      try { await ensure(false); } catch { say("连不上灵矽，稍后再试", 6000); return; }
+      voice.connected = true;
       stopPlayback();
       if (listening) stopListening(false);
       send({ type: "text", text });
@@ -969,47 +1239,52 @@ body.play #sayline { display: block; }
 
     // 一键开局（#59）：第一次点按完成授权和连接，还没开局就直接开始审讯
     const firstTap = async () => {
-      setState("connecting", "正在连接灵矽…");
-      let micOk = true;
+      setState("connecting", "正在连接…");
       try {
         await ensure(true);
+        voice.mic = true;
       } catch (err) {
-        micOk = false;
-        try { await ensure(false); } catch { setState("idle", "开始游戏"); return; }
-        say(err && err.name === "NotAllowedError" ? "没有麦克风权限：可以点线索卡出示，或者打字提问" : "麦克风用不了：可以点线索卡出示，或者打字提问", 8000);
+        voice.mic = false;
+        try { await ensure(false); } catch { setState("off", "开始游戏"); say("连不上灵矽，稍后再试", 6000); return; }
+        $("askForm").hidden = false;
+        const why = err && err.name === "NotAllowedError" ? "没有麦克风权限" : "麦克风用不了";
+        say(`${why}：可以打字提问，把线索卡拖到证词上出示`, 8000);
       }
-      connected = true;
-      setState("idle", IDLE);
+      voice.connected = true;
       if (!snap || chooseScene() === "briefing") sendText("开始审讯");
-      else if (micOk) say("连上了。点一下按钮说话，说完停一下就会自动发送");
+      else arm();
     };
 
-    // 点一下：开始听，停顿后灵矽自动判断说完；按住超过半秒：松开即发送；听的时候再点一下：马上发送（#59）
+    // 状态球：开局；它说话或在想时点一下就打断、马上听你说；等你说话时点一下也马上开始听；
+    // 在听时点一下立刻发送；按住说话，松开发送；暂停时点一下继续
     const down = async (e) => {
       if (e) e.preventDefault();
-      if (talk.dataset.state === "connecting") return;
-      if (!window.isSecureContext || !navigator.mediaDevices) { say("需要用 https 打开本页才能使用麦克风", 8000); return; }
-      if (!connected) { await firstTap(); return; }
-      if (listening) { stopListening(true); return; }
-      try { await ensure(true); } catch { say("麦克风用不了：可以点线索卡出示，或者打字提问", 6000); return; }
-      stopPlayback();  // 打断嫌疑人：玩家开口时先停掉正在播的语音
-      listening = true;
-      pressAt = Date.now();
-      send({ type: "start", mode: "auto" });
-      setState("talking", "在听…说完停一下");
-      listenTimer = setTimeout(() => stopListening(true), 15000);  // 一直没停顿也别无限听下去
+      const st = talk.dataset.state;
+      if (st === "connecting") return;
+      if (!voice.connected) { await firstTap(); return; }
+      if (st === "talking") { endTurn(); return; }
+      if (!voice.mic) {
+        try { await ensure(true); voice.mic = true; $("askForm").hidden = true; arm(); }
+        catch { say("还是用不了麦克风：可以打字，或者把线索卡拖到证词上", 6000); }
+        return;
+      }
+      if (st === "paused") {
+        setState("connecting", "正在连接…");
+        try { await ensure(true); } catch { say("连不上灵矽，稍后再点一下", 6000); arm(); return; }
+        paused = false;
+        arm();
+        return;
+      }
+      holding = true;
+      beginTurn(false);
     };
     const up = (e) => {
       if (e) e.preventDefault();
-      if (listening && Date.now() - pressAt > 500) stopListening(true);  // 按住说的：松开就发送
+      if (!holding) return;
+      holding = false;
+      if (listening && Date.now() - pressAt > 600) endTurn();  // 按住说的：松开就发送
     };
 
-    const cluesBtn = $("cluesBtn");
-    cluesBtn.addEventListener("click", () => {
-      const open = $("clues").hidden;
-      $("clues").hidden = !open;
-      cluesBtn.setAttribute("aria-expanded", String(open));
-    });
     $("askForm").addEventListener("submit", (e) => {
       e.preventDefault();
       const text = $("askInput").value.trim();
@@ -1026,11 +1301,15 @@ body.play #sayline { display: block; }
     const typing = (e) => e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
     addEventListener("keydown", (e) => { if (e.code === "Space" && !e.repeat && !typing(e)) down(e); });
     addEventListener("keyup", (e) => { if (e.code === "Space" && !typing(e)) up(e); });
-    // 还没点过按钮时，按场景决定按钮文字：开局前是「开始游戏」，对局中是「点一下说话」
-    onSnap = () => { if (!connected && talk.dataset.state === "idle") setState("idle", chooseScene() === "briefing" ? "开始游戏" : IDLE); };
-    if (snap) onSnap();
-    renderSay();
-    if (snap) renderClues();
+    // 切到后台：不在后台偷偷听
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) return;
+      if (listening) endTurn();
+      if (talk.dataset.state === "ready") { paused = true; arm(); }
+    });
+    // 还没点过按钮时，按场景决定按钮文字：开局前是「开始游戏」，对局中是「继续游戏」
+    onSnap = () => { if (!voice.connected && talk.dataset.state === "off") setState("off", chooseScene() === "briefing" ? "开始游戏" : "继续游戏"); };
+    if (snap) { onSnap(); renderDesk(); renderTargets(); }
   }
 
   show("briefing");
