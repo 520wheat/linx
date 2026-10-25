@@ -68,6 +68,8 @@ def test_guard_blocks_confession_and_breaking_character():
     assert violation("好吧，是我拿的。", may_confess=False) == "premature-confession"
     assert violation("好吧，是我拿的。", may_confess=True) is None
     assert violation("作为一个AI，我不能回答。", may_confess=False) == "out-of-character"
+    assert violation("有什么可以帮你的吗？", may_confess=False) == "out-of-character"
+    assert violation("请问您需要什么？", may_confess=False) == "out-of-character"
     assert violation("我一直在包厢唱歌。", may_confess=False) is None
     assert violation("好吧，我承认我上过十八楼。", may_confess=False) is None
     assert violation("是我，拿的。", may_confess=False) == "premature-confession"
@@ -81,6 +83,15 @@ def test_guard_blocks_confession_and_breaking_character():
     assert violation("那手镯我真不该拿。", may_confess=False, stolen=("手镯",)) == "premature-confession"
     assert violation("手镯就藏在我房间。", may_confess=False, stolen=("手镯",)) == "premature-confession"
     assert violation("手镯放哪我怎么知道。", may_confess=False, stolen=("手镯",)) is None
+
+
+def test_suspect_system_forbids_assistant_voice(case):
+    from pozhan.director.suspect import _system
+
+    prompt = _system(case, new_game(case, 0), 0)
+    assert "你就是嫌疑人" in prompt
+    assert "不是语音助手" in prompt
+    assert "严禁问好" in prompt
 
 
 async def test_briefing_is_deterministic_and_reads_claims_verbatim(case):

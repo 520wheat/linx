@@ -40,6 +40,12 @@ def test_shipped_cases_are_valid(path):
     assert validate(load_case(path)) == []
 
 
+@pytest.mark.parametrize("path", CASES, ids=lambda p: p.stem)
+def test_persona_forbids_assistant_voice(path):
+    case = load_case(path)
+    assert "不要问好" in case.suspect.persona
+
+
 def test_only_opening_claims_are_said_at_first(v2):
     state = new_game(v2, 0)
     assert state.revealed == (1, 2)
