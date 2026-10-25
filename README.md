@@ -42,3 +42,16 @@ python -m http.server 8080
 ## 语音
 
 Demo 先用浏览器语音：听玩家说话，并用中文语音念嫌疑人的回答。灵矽实时通道留在 `js/linx.js`。有 Token、Device-Id 后，把 `js/voice.js` 的听和说换成 `wss://xrobo-io.qiniuapi.com/v1/ws/` 即可，玩法不用改。
+
+## 三人分工
+
+先对齐接口，再各改各的文件，都提交到 `main`。
+
+**甲 · 玩法引擎**  
+改 `js/engine.js`、`js/case.js`、`tests/engine.test.js`。把选卡、出示、漏嘴、招供、超时收进 `GameEngine`。最多两张卡；小票加监控第一次漏嘴，第二次结案；时间到判负。
+
+**乙 · 语音和灵矽**  
+改 `js/voice.js`、`js/linx.js`、`tests/voice.test.js`。对外只有听、停、说。有 Token 走灵矽，失败或没密钥就回退浏览器语音，审讯不能卡住。
+
+**丙 · 界面和提交包装**  
+改 `index.html`、`css/app.css`、`js/game.js`、`README.md`。页面只负责显示：左嫌疑人、中对话、下四张卡、右侧按住问话。开始页不剧透关键组合。接上甲的引擎和乙的语音，做成评委能玩的一屏。
