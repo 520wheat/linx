@@ -1,2 +1,12 @@
 .superpowers/
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+.env
+.env.*
+logs/
+.data/
