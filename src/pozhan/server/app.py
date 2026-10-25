@@ -101,7 +101,9 @@ def create_app(
 
     def current_snapshot(device: str | None) -> dict:
         key = screen.resolve(device) if screen else None
-        return (screen.latest(key) if screen else None) or build_snapshot(game.case, None, time.time())
+        snap = (screen.latest(key) if screen else None) or build_snapshot(game.case, None, time.time())
+        # hub 里存的是发布时刻的快照；前端用 serverNow 校准倒计时，所以这里换成当前时间
+        return {**snap, "serverNow": time.time()}
 
     @app.get("/screen")
     async def screen_page():
@@ -124,21 +126,25 @@ def create_app(
         channel = (screen.resolve(device) or device) if device else ANY
 
         async def events() -> AsyncIterator[str]:
+            # 先发约 2KB 的注释：有些代理和隧道会把很小的数据块攒在缓冲里不往下发
+            yield ":" + " " * 2048 + "\n\n"
             yield f"data: {json.dumps(current_snapshot(device), ensure_ascii=False)}\n\n"
-            updates = screen.subscribe(channel)
+            queue = screen.subscribe(channel)
             try:
                 while True:
                     try:
-                        snap = await asyncio.wait_for(anext(updates), timeout=15)
+                        snap = await asyncio.wait_for(queue.get(), timeout=15)
                     except TimeoutError:
                         yield ": keepalive\n\n"  # 让反向代理和隧道不因空闲断开连接
                         continue
                     yield f"data: {json.dumps(snap, ensure_ascii=False)}\n\n"
             finally:
-                await updates.aclose()
+                screen.unsubscribe(channel, queue)
 
         return StreamingResponse(
-            events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
     @app.get("/healthz")

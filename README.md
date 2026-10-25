@@ -18,6 +18,8 @@
 
 一页纸的玩家须知见 [docs/players.md](docs/players.md)。
 
+**陪玩屏（可选）**：在电视或平板上打开 `服务地址/screen?token=…`，就有一块随对局实时更新的只读大屏，显示证词状态、心理防线、律师倒计时和字幕；戳破证词时会全屏强调。配置方法见[上线指南](docs/deploy.md#陪玩屏可选)。
+
 ## 快速开始
 
 需要 Python 3.12+ 和 [uv](https://docs.astral.sh/uv/)。
@@ -47,6 +49,7 @@ LLM_BASE_URL=https://你的-openai-兼容地址/v1 LLM_API_KEY=你的密钥 POZH
 | 变量 | 说明 | 默认值 |
 |---|---|---|
 | `POZHAN_API_KEY` | 接口密钥。灵矽「我的模型」里的「API密钥」填同一个值。**上线必须设置** | 空（不校验） |
+| `POZHAN_SCREEN_TOKEN` | 陪玩屏的只读令牌，打开 `/screen?token=…` 时使用 | 空（不校验） |
 | `LLM_BASE_URL` / `LLM_API_KEY` | 大模型的 OpenAI 兼容接口 | 空 |
 | `INTENT_MODEL` | 意图分类模型：判断玩家是不是在出示线索卡 | `doubao-seed-2.0-mini` |
 | `SUSPECT_MODEL` | 嫌疑人台词模型 | `deepseek/deepseek-v4.1-flash` |
