@@ -225,7 +225,13 @@ body.portrait #cluesBtn { display: none; }
 #clues .clue-row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 12px; border-radius: 10px; background: var(--soft); }
 #clues .clue-row.used { opacity: .55; }
 /* 点卡出示（#59） */
-#clues .clue-row { grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; }
+#clues .clue-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; }
+/* 线索卡插图（#63）：缩略图，左上角叠卡号 */
+#clues .no i { font-style: normal; }
+#clues .no.pic { position: relative; width: 72px; height: 72px; background-size: cover; background-position: center; }
+#clues .no.pic i { position: absolute; left: 4px; top: 4px; min-width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+  background: rgba(42, 54, 68, .82); color: #fff; font: 700 13px var(--mono); }
+.evidence .no.pic { width: 168px; height: 168px; flex: none; background-size: cover; background-position: center; }
 #clues .present { align-self: center; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--solid); color: #fff;
   font: 700 14px var(--sans); cursor: pointer; }
 #clues .pick { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 4px; font-size: 14px; color: var(--ink-3); }
@@ -233,6 +239,13 @@ body.portrait #cluesBtn { display: none; }
   font: 500 14px var(--sans); cursor: pointer; }
 .chip:hover { border-color: var(--solid); }
 #sayline .chip { margin-left: 6px; padding: 4px 10px; font-size: 13px; }
+/* 窄屏：「点一下」的短语换行居中，不被裁掉 */
+@media (max-width: 720px) {
+  #sayline { white-space: normal; text-align: center; line-height: 2.2; bottom: 74px; }
+  body.portrait #clues, body.portrait #clues[hidden] { bottom: 140px; }
+  #clues .clue-row { grid-template-columns: auto minmax(0, 1fr); }
+  #clues .present { grid-column: 2; justify-self: start; }
+}
 /* 打字提问（#59） */
 .ask { display: flex; gap: 8px; }
 .ask input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font: 15px var(--sans);
@@ -451,6 +464,7 @@ body.play #sayline { display: block; }
   function renderArt(caseId) {
     if (artCase === caseId) return;
     artCase = caseId;
+    cardArt.clear();
     const base = location.pathname.replace(/\/?$/, "/") + "img/" + encodeURIComponent(caseId) + "/";
     const cover = $("cover");
     cover.hidden = true;
@@ -465,7 +479,19 @@ body.play #sayline { display: block; }
       avatars.forEach((a) => { a.classList.add("photo"); a.style.backgroundImage = `url("${img.src}")`; });
     };
     img.src = base + "suspect.jpg";
+    // 线索卡插图（#63）：加载成功的才显示，取不到就保持纯文字
+    for (const card of (snap && snap.cards) || []) {
+      const p = new Image();
+      p.onload = () => {
+        if (artCase !== caseId) return;
+        cardArt.set(card.id, p.src);
+        renderClues();
+      };
+      p.src = base + `card-${card.id}.jpg`;
+    }
   }
+  const cardArt = new Map();  // 当前案子已加载的线索卡插图：卡号 → 地址
+  const cardPic = (id) => cardArt.get(id) || null;
 
   function renderCommon() {
     const c = snap.case;
@@ -528,8 +554,11 @@ body.play #sayline { display: block; }
   function renderMoment(ev) {
     $("mClaim").textContent = `证词 ${pad(ev.claim)}`;
     $("mWas").textContent = ev.claimText;
-    $("mCard").textContent = String(ev.card);
-    $("mCardTitle").textContent = ev.cardTitle;
+    const pic = cardPic(ev.card);
+    $("mCard").textContent = pic ? "" : String(ev.card);
+    $("mCard").classList.toggle("pic", !!pic);
+    $("mCard").style.backgroundImage = pic ? `url("${pic}")` : "";
+    $("mCardTitle").textContent = pic ? `${CN[ev.card] || ev.card}号卡 · ${ev.cardTitle}` : ev.cardTitle;
     $("mCardText").textContent = ev.cardText;
     $("mFrom").textContent = ev.fromStage;
     $("mTo").textContent = ev.toStage;
@@ -605,7 +634,11 @@ body.play #sayline { display: block; }
       const row = el("div", "clue-row" + (card.used ? " used" : ""));
       const body = el("div");
       body.append(el("b", null, card.used ? `${card.title} · 已用` : card.title), el("p", null, card.text || ""));
-      row.append(el("span", "no", String(card.id)), body);
+      const no = el("span", "no");
+      no.append(el("i", null, String(card.id)));
+      const pic = cardPic(card.id);
+      if (pic) { no.classList.add("pic"); no.style.backgroundImage = `url("${pic}")`; }
+      row.append(no, body);
       const holding = (snap.claims || []).filter((c) => c.status === "holding");
       if (sendText && holding.length && chooseScene() === "interrogating") {
         // 点卡出示（#59）：选好证词就替玩家说「用 N 号卡反驳证词 M」
