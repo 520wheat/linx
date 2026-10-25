@@ -258,3 +258,39 @@ async def test_art_is_served_without_a_token(client_for, tmp_path):
     if shipped:
         r = await http.get(f"/screen/img/{shipped[0].parent.name}/suspect.jpg")
         assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+
+async def test_select_endpoint_switches_case(client_for):
+    from dataclasses import replace
+
+    case = load_case(GOLDEN_WATCH)
+    other = replace(case, id="other", title="另一个案子")
+    hub = RecordingHub()
+    game = Game(
+        case=case,
+        cases=(case, other),
+        interpreter=Interpreter(RuleMatcher(), classifier=None),
+        director=Director(llm=None, model=""),
+        store=MemoryStore(),
+        screen=hub,
+    )
+    http = client_for(create_app(game, HeaderResolver(), screen=hub, screen_token="t0k"))
+    assert (await http.post("/screen/select", json={"id": "other"})).status_code == 401
+    idle = (await http.get("/screen/state?token=t0k")).json()
+    assert idle["case"]["id"] == "golden-watch"
+    r = await http.post("/screen/select?token=t0k", json={"id": "other"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["case"]["id"] == "other" and body["case"]["title"] == "另一个案子"
+    assert [c["id"] for c in body["library"]] == ["golden-watch", "other"]
+    assert (await http.get("/screen/state?token=t0k")).json()["case"]["id"] == "other"
+    missing = await http.post("/screen/select?token=t0k", json={"id": "nope"})
+    assert missing.status_code == 404
+
+
+async def test_screen_page_embeds_the_case_list(client_for):
+    _, _, app = make()
+    r = await client_for(app).get("/screen")
+    assert r.status_code == 200
+    html = r.text
+    assert "年会夜的金表" in html
+    assert "/*BOOT_LIBRARY*/null" not in html

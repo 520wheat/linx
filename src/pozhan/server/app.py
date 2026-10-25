@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from pozhan.game import Game
@@ -102,13 +102,31 @@ def create_app(
         )
         return hmac.compare_digest(given.strip(), screen_token)
 
+    def library() -> list[dict]:
+        return [{"id": c.id, "title": c.title} for c in game.cases]
+
+    def play_key(request: Request) -> str:
+        # 网页开玩和灵矽走同一局：有设备时用 x-linx-device-id，避免点选关切了 default、说话却在另一局里
+        device = request.query_params.get("device")
+        if voice is not None and (not device or device == voice.device.mac):
+            return f"x-linx-device-id:{voice.device.mac}"
+        if device and screen is not None:
+            found = screen.resolve(device)
+            if found:
+                return found
+            return f"x-linx-device-id:{device}"
+        if screen is not None and screen.last_key:
+            return screen.last_key
+        return "default"
+
     def current_snapshot(device: str | None) -> dict:
         key = screen.resolve(device) if screen else None
         snap = (screen.latest(key) if screen else None) or build_snapshot(
             game.case, None, time.time(), game.cases
         )
         # hub 里存的是发布时刻的快照；前端用 serverNow 校准倒计时，所以这里换成当前时间
-        return {**snap, "serverNow": time.time()}
+        # library 每次现取，避免缓存快照里没有案件名单（#67）
+        return {**snap, "serverNow": time.time(), "library": library()}
 
     @app.get("/")
     async def root(request: Request):
@@ -121,8 +139,11 @@ def create_app(
 
     @app.get("/screen")
     async def screen_page():
-        # 页面本身不含对局数据，数据接口才校验令牌；页面从自己的 URL 里取 token 去请求数据
-        return FileResponse(PAGE, media_type="text/html; charset=utf-8")
+        # 页面本身不含对局数据，但把案件名单嵌进去：选关不依赖 /screen/state 是否已经返回
+        html = PAGE.read_text(encoding="utf-8").replace(
+            "/*BOOT_LIBRARY*/null", json.dumps(library(), ensure_ascii=False), 1
+        )
+        return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
     @app.get("/screen/voice/status")
     async def voice_status(request: Request):
@@ -150,6 +171,27 @@ def create_app(
     async def screen_state(request: Request):
         if not screen_allowed(request):
             return _error(401, "invalid screen token")
+        return current_snapshot(request.query_params.get("device"))
+
+    @app.post("/screen/select")
+    async def screen_select(request: Request):
+        # 网页点选关（#67）：不经过灵矽发话，直接切案并开新局
+        if not screen_allowed(request):
+            return _error(401, "invalid screen token")
+        try:
+            body = await request.json()
+        except ValueError:
+            return _error(400, "body must be JSON")
+        if not isinstance(body, dict):
+            return _error(400, "body must be a JSON object")
+        case_id = str(body.get("id") or body.get("case_id") or "").strip()
+        if not case_id:
+            return _error(400, "missing case id")
+        if not any(c.id == case_id for c in game.cases):
+            return _error(404, "unknown case")
+        key = play_key(request)
+        async for _ in game.turn(key, f"切换到案子 {case_id}"):
+            pass
         return current_snapshot(request.query_params.get("device"))
 
     @app.get("/screen/events")
