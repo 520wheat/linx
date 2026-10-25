@@ -259,6 +259,7 @@ async def test_art_is_served_without_a_token(client_for, tmp_path):
         r = await http.get(f"/screen/img/{shipped[0].parent.name}/suspect.jpg")
         assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
 
+
 async def test_select_endpoint_switches_case(client_for):
     from dataclasses import replace
 
