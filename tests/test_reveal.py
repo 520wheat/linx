@@ -52,7 +52,7 @@ def test_unsaid_claim_numbers_are_unknown_not_strikes(v2):
     state = new_game(v2, 0)
     state, out = apply(v2, state, Present(card=6, claim=3), 1)
     assert out == UnknownRef(card=None, claim=3) and state.strikes == 0
-    assert narrator.unknown_ref(v2, state, None, 3) == "没有第三条证词，他到现在只说过二条。"
+    assert narrator.unknown_ref(v2, state, None, 3) == "没有第三条证词，他到现在只说过两条。"
 
 
 def test_breaking_a_claim_can_amend_it_into_a_new_lie(v2):
@@ -79,8 +79,10 @@ def test_topic_that_is_not_open_is_an_ordinary_question(v2):
     assert isinstance(out, Answer)
 
 
-def test_presenting_without_asking_can_never_win(v2):
-    """穷举所有「只出示、不提问」的走法：律师到场之前不可能让嫌疑人认罪。"""
+@pytest.mark.parametrize("path", CASES, ids=lambda p: p.stem)
+def test_presenting_without_asking_can_never_win(path):
+    """每个正式案件都穷举所有「只出示、不提问」的走法：律师到场之前不可能让嫌疑人认罪。"""
+    v2 = load_case(path)
     start = new_game(v2, 0)
     queue, seen = deque([start]), {start}
     while queue:

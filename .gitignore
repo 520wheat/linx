@@ -8,3 +8,4 @@ dist/
 .env.*
 logs/
 .data/
+cases/drafts/

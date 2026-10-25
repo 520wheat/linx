@@ -15,6 +15,7 @@ class Session:
     key: str
     state: Interrogation | None = None
     game_id: str = ""
+    case_id: str = ""  # 这一局在审哪个案子（#53）；为空表示案件库里的第一个
     last_reply: str = ""  # 「再说一遍」时原样复述
     history: list[Message] = field(default_factory=list)  # 服务端自己保存对话，不依赖平台传来的历史
     updated_at: float = field(default_factory=time.time)

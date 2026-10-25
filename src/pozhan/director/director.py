@@ -17,6 +17,7 @@ from pozhan.engine.outcomes import (
     Answer,
     Briefing,
     Broke,
+    CaseList,
     Confession,
     GameOver,
     Lawyer,
@@ -151,5 +152,7 @@ class Director:
                 yield say(narrator.rules(case))
             case Quit():
                 yield say(narrator.quit_game(case))
+            case CaseList(titles=titles, current=current):
+                yield say(narrator.case_list(titles, current))
             case GameOver():
                 yield say(narrator.game_over())

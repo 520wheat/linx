@@ -173,7 +173,7 @@ def create_app(
 
     @app.get("/healthz")
     async def healthz() -> dict:
-        return {"ok": True, "case": game.case.id}
+        return {"ok": True, "case": game.case.id, "cases": [c.id for c in game.cases]}
 
     @app.get("/v1/models")
     async def models(request: Request):

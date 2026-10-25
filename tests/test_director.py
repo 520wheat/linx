@@ -71,6 +71,13 @@ def test_guard_blocks_confession_and_breaking_character():
     assert violation("我一直在包厢唱歌。", may_confess=False) is None
     assert violation("好吧，我承认我上过十八楼。", may_confess=False) is None
     assert violation("是我，拿的。", may_confess=False) == "premature-confession"
+    # 否认、对别的东西的让步都不是认罪（#53）
+    assert violation("真不是我拿的！", may_confess=False) is None
+    assert violation("手镯真不是我拿的。", may_confess=False, stolen=("手镯",)) is None
+    assert violation("房卡是我拿的，可我没进去。", may_confess=False, stolen=("手镯",)) is None
+    assert violation("那手镯是我拿的。", may_confess=False, stolen=("手镯",)) == "premature-confession"
+    assert violation("我拿了那只手镯。", may_confess=False, stolen=("手镯",)) == "premature-confession"
+    assert violation("东西是我偷的。", may_confess=False) == "premature-confession"
 
 
 async def test_briefing_is_deterministic_and_reads_claims_verbatim(case):
@@ -154,7 +161,7 @@ async def test_wrong_presentation_has_rebuttal_and_countdown(case):
     assert [line.text for line in out] == [
         "这张卡驳不倒证词一。",
         "我去洗手间了不行吗？",
-        "律师还有二次就到。",
+        "律师还有两次就到。",
     ]
 
 

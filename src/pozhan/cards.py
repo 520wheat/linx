@@ -48,13 +48,13 @@ def _help(case: Case) -> str:
         '<div class="tag">玩 法 速 查</div>'
         f"<h2>审问 {escape(case.suspect.name)}</h2>"
         "<ol>"
-        "<li>对设备说<b>「开始审讯」</b>，听案情和三条证词。</li>"
-        "<li>随便提问，找出证词里的破绽。</li>"
+        "<li>对设备说<b>「开始审讯」</b>，听案情和开场证词。</li>"
+        "<li>随便提问，找出证词里的破绽。问到关键处他会说出新证词，被戳破后还会改口。</li>"
         "<li>拍出一张卡，说<b>「用 X 号卡反驳证词 Y」</b>。</li>"
         f"<li>戳穿全部证词就破案；出示错 {case.limits.strikes} 次或超过 "
         f"{case.limits.minutes} 分钟，律师就到了。</li>"
         "<li>随时可以说：<b>念一下证词</b> · <b>念一下 X 号卡</b> · <b>还有几次机会</b> · "
-        "<b>再说一遍</b> · <b>重新开始</b>。</li>"
+        "<b>再说一遍</b> · <b>重新开始</b> · <b>下一个案子</b>。</li>"
         "</ol>"
         f'<div class="case">《破绽》· {escape(case.title)}</div>'
         "</div>"

@@ -114,6 +114,14 @@ class Quit:
 
 
 @dataclass(frozen=True)
+class CaseList:
+    """念案件库里的案子（#53）。current 是正在玩的案子在列表里的下标。"""
+
+    titles: tuple[str, ...]
+    current: int
+
+
+@dataclass(frozen=True)
 class GameOver:
     """游戏已结束后又有输入：提示可以重新开始。"""
 
@@ -135,5 +143,6 @@ Outcome = (
     | Rules
     | Repeat
     | Quit
+    | CaseList
     | GameOver
 )

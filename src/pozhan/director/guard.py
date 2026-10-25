@@ -2,10 +2,12 @@
 
 import re
 
-# 只拦「认罪」，不拦让步：「我承认我上过楼」是合法的让步
-_CONFESS = re.compile(
-    r"是我(?:拿|偷|干)的|我(?:认罪|坦白)|(?:表|东西)是我(?:拿|偷)|我(?:拿|偷)了(?:那块)?表|我偷了"
-)
+# 只拦「认罪」，不拦让步：「我承认我上过楼」是合法的让步。
+# 「是我拿的」要看前面是什么（#53 自对弈发现）：「不是我拿的」是否认，「房卡是我拿的」是对别的东西的让步，
+# 只有单独说、或者说的是被盗物时才算认罪。被盗物由案件的 suspect.stolen 给出
+_CONFESS = re.compile(r"我(?:认罪|坦白)|我偷了")
+_IT_WAS_ME = re.compile(r"是我(拿|偷|干)走?的")
+_FILLER_BEFORE = set("吧啊呀嗯对错了就都")
 _OUT_OF_CHARACTER = re.compile(
     r"AI|人工智能|语言模型|大模型|提示词|系统设定|作为一个|我是一个程序|游戏规则|扮演", re.I
 )
@@ -27,10 +29,30 @@ def clean(text: str) -> str:
     return _STRIP.sub("", text).replace("\n", "").strip()
 
 
-def violation(sentence: str, *, may_confess: bool) -> str | None:
+def _confesses(plain: str, stolen: tuple[str, ...]) -> bool:
+    if _CONFESS.search(plain):
+        return True
+    objects = (*stolen, "东西", "它")
+    if any(
+        f"我{verb}了{det}{s}" in plain
+        for verb in "拿偷"
+        for det in ("", "那块", "那个", "那页", "那只")
+        for s in stolen
+    ):
+        return True
+    for m in _IT_WAS_ME.finditer(plain):
+        before = plain[: m.start()]
+        if before.endswith(("不", "没")):
+            continue  # 「不是我拿的」是否认
+        if m.group(1) in "偷干" or not before or before[-1] in _FILLER_BEFORE or before.endswith(objects):
+            return True
+    return False
+
+
+def violation(sentence: str, *, may_confess: bool, stolen: tuple[str, ...] = ()) -> str | None:
     """返回违规原因；没问题返回 None。去掉标点再匹配：「是我，拿的」也算认罪。"""
     plain = _PUNCT.sub("", sentence)
-    if not may_confess and _CONFESS.search(plain):
+    if not may_confess and _confesses(plain, stolen):
         return "premature-confession"
     if _OUT_OF_CHARACTER.search(plain):
         return "out-of-character"

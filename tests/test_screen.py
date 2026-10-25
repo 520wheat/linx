@@ -208,3 +208,25 @@ def test_device_subscription_before_first_publish():
     hub.publish("x-linx-device-id:cc:dd", {"n": 1})
     hub.publish("x-linx-device-id:aa:bb", {"n": 2})
     assert q.get_nowait() == {"n": 2} and q.empty()
+
+
+async def test_screen_follows_the_case_switch(client_for):
+    from dataclasses import replace
+
+    case = load_case(GOLDEN_WATCH)
+    other = replace(case, id="other", title="另一个案子")
+    hub = RecordingHub()
+    game = Game(
+        case=case,
+        cases=(case, other),
+        interpreter=Interpreter(RuleMatcher(), classifier=None),
+        director=Director(llm=None, model=""),
+        store=MemoryStore(),
+        screen=hub,
+    )
+    http = client_for(create_app(game, HeaderResolver(), screen=hub))
+    await say(http, "开始审讯")
+    assert hub.published[-1]["case"]["title"] == case.title
+    await say(http, "下一个案子")
+    assert hub.published[-1]["case"]["title"] == "另一个案子"
+    assert hub.published[-1]["event"]["kind"] == "briefing"

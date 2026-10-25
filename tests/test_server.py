@@ -67,7 +67,7 @@ async def test_full_winning_game_over_http(tmp_path):
     assert (await c.say("念一下证词")).startswith("😶")
     assert "电梯监控截图" in await c.say("念一下2号卡")
     wrong = await c.say("用1号卡反驳证词1")
-    assert wrong.startswith("😌") and "律师还有二次就到" in wrong
+    assert wrong.startswith("😌") and "律师还有两次就到" in wrong
     broke = await c.say("用2号卡反驳证词1")
     assert broke.startswith("😠") and "证词一被戳破" in broke
     assert (await c.say("三号卡反驳第二条证词")).startswith("😲")
@@ -91,7 +91,7 @@ async def test_losing_game_and_restart(tmp_path):
     assert "律师到了" in lost and "真相是" in lost
     again = await c.say("重新开始")
     assert again.startswith("😌") and "九点到十点" in again
-    assert "律师还有二次" in await c.say("1号卡反驳证词1")
+    assert "律师还有两次" in await c.say("1号卡反驳证词1")
 
 
 async def test_repeat_replays_last_reply(tmp_path):
@@ -108,7 +108,7 @@ async def test_sessions_are_separated_by_device_header(tmp_path):
     await a.say("开始")
     await b.say("开始")
     assert "证词一被戳破" in await a.say("2号卡反驳证词1")
-    assert "律师还有二次" in await b.say("1号卡反驳证词1")  # b 那局不受 a 影响
+    assert "律师还有两次" in await b.say("1号卡反驳证词1")  # b 那局不受 a 影响
 
 
 async def test_api_key_is_required_when_configured(tmp_path):

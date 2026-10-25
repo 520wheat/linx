@@ -69,6 +69,11 @@ def parse_case(data: dict[str, Any]) -> Case:
                 persona=_tidy(_require(suspect, "persona", "suspect")),
                 truth=tuple(suspect.get("truth") or ()),
                 confession=_tidy(suspect.get("confession") or ""),
+                stolen=tuple(
+                    [suspect["stolen"]]
+                    if isinstance(suspect.get("stolen"), str)
+                    else suspect.get("stolen") or ()
+                ),
             ),
             claims=tuple(
                 Claim(
@@ -133,3 +138,22 @@ def parse_case(data: dict[str, Any]) -> Case:
 def load_case(path: str | Path) -> Case:
     with open(path, encoding="utf-8") as f:
         return parse_case(yaml.safe_load(f))
+
+
+INDEX = "index.txt"
+
+
+def load_library(directory: str | Path) -> tuple[Case, ...]:
+    """加载目录下的全部案件（#53），不含子目录（例如 drafts/ 里的初稿）。
+
+    顺序按目录里 index.txt 列出的案件 id；没列出的按文件名排在后面。
+    """
+    directory = Path(directory)
+    cases = {c.id: c for c in (load_case(p) for p in sorted(directory.glob("*.yaml")))}
+    index = directory / INDEX
+    order = [ln.strip() for ln in index.read_text(encoding="utf-8").splitlines()] if index.exists() else []
+    order = [i for i in order if i and not i.startswith("#")]
+    unknown = [i for i in order if i not in cases]
+    if unknown:
+        raise CaseFormatError(f"{INDEX} 列出了不存在的案件：{'、'.join(unknown)}")
+    return tuple(cases[i] for i in order) + tuple(c for i, c in cases.items() if i not in order)

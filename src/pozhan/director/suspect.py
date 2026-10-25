@@ -158,7 +158,7 @@ class Suspect:
                     s = clean(s)
                     if not s:
                         continue
-                    reason = violation(spoken + s, may_confess=may_confess)
+                    reason = violation(spoken + s, may_confess=may_confess, stolen=case.suspect.stolen)
                     if reason or said + len(s) > MAX_CHARS:
                         if reason:
                             log.warning("suspect line blocked (%s): %s", reason, s)
@@ -171,7 +171,7 @@ class Suspect:
             tail = clean(buffer)
             if (
                 tail
-                and not violation(spoken + tail, may_confess=may_confess)
+                and not violation(spoken + tail, may_confess=may_confess, stolen=case.suspect.stolen)
                 and said + len(tail) <= MAX_CHARS
             ):
                 said += len(tail)

@@ -50,7 +50,8 @@ async def show(director, case, state, outcome, label, history):
 
 
 async def main():
-    case = load_case(ROOT / "cases" / "golden-watch.yaml")
+    # 固定场景用第一版案件：下面的矛盾编号按第一版写（#46 之后正式案件改了版）
+    case = load_case(ROOT / "tests" / "fixtures" / "golden-watch-v1.yaml")
     llm = OpenAICompatLLM(
         os.environ["LLM_BASE_URL"],
         os.environ["LLM_API_KEY"],

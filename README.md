@@ -9,12 +9,14 @@
 ## 怎么玩
 
 1. 打印线索卡（见下文），摆在桌上。
-2. 对设备说「开始审讯」，听案情和嫌疑人的三条证词。
-3. 随便提问，找证词里的破绽。
-4. 拍出一张卡，说「用二号卡反驳证词一」，或者直接说「电梯监控拍到你九点半上了十八楼」。
+2. 对设备说「开始审讯」，听案情和嫌疑人的开场证词。
+3. 随便提问，找证词里的破绽。**证词会越审越多**：问到关键的事，他会说出新的证词；被戳破后，他会改口编出新的谎话。证词按说出口的顺序编号。
+4. 拍出一张卡，说「用二号卡反驳证词一」，或者直接说「看这张，电梯监控拍到你九点半上了十八楼」。
 5. 戳穿全部证词就破案。出示错三次，或者审讯超过十五分钟，律师就会到场，你们输了。
+   - 有的卡和证词沾边、但不够硬：出示了不扣次数，嫌疑人会搪塞过去。
+   - 只是在提问里提到卡的内容、没有明确出示：驳不倒也不扣次数。
 
-随时可以说：「念一下证词」「念一下三号卡」「还有几次机会」「再说一遍」「重新开始」「结束游戏」。
+随时可以说：「念一下证词」「念一下三号卡」「还有几次机会」「规则」「再说一遍」「重新开始」「下一个案子」「有哪些案子」「结束游戏」。
 
 一页纸的玩家须知见 [docs/players.md](docs/players.md)。
 
@@ -57,20 +59,31 @@ LLM_BASE_URL=https://你的-openai-兼容地址/v1 LLM_API_KEY=你的密钥 POZH
 | `INTENT_MODEL` | 意图分类模型：判断玩家是不是在出示线索卡 | `doubao-seed-2.0-mini` |
 | `SUSPECT_MODEL` | 嫌疑人台词模型 | `deepseek/deepseek-v4.1-flash` |
 | `LLM_EXTRA_BODY` | 附加到每次模型请求的 JSON | `{"thinking": {"type": "disabled"}}`（关闭思考，降低延迟） |
-| `POZHAN_CASE` | 案件文件 | `cases/golden-watch.yaml` |
+| `POZHAN_CASES` | 案件库目录，顺序见目录里的 `index.txt` | `cases` |
+| `POZHAN_CASE` | 只玩这一个案件文件（调试、评测用），设置后不加载案件库 | 空 |
 | `POZHAN_LOG_DIR` | 日志目录（对局日志在 `games/` 下） | `logs` |
 | `POZHAN_LOG_REQUESTS` | 设为 `1` 时记录平台发来的原始请求（不含鉴权头） | 关闭 |
 | `HOST` / `PORT` | 监听地址和端口 | `127.0.0.1` / `8000` |
 
 ## 写一个新案件
 
-案件是一个 YAML 文件，格式参考 [cases/golden-watch.yaml](cases/golden-watch.yaml)，包括案情、嫌疑人人设与真相、证词、线索卡、矛盾表和档位。写完先校验：
+案件是一个 YAML 文件，放在 `cases/` 目录下，格式参考 [cases/golden-watch.yaml](cases/golden-watch.yaml)。内容包括：案情、嫌疑人的人设、真相和认罪内容、证词、线索卡、矛盾表、间接证据和档位。
+
+- **证词的 `unlock`**：写 `topic` 和 `examples`，就要问到这个话题才会说出口；只写 `after`，就是这条证词被戳破后改口说出的新谎话。
+- **`weak`**：沾边但驳不倒的卡，出示时不扣次数。
+- **顺序**：写在 `cases/index.txt` 里，决定「开始审讯」和「下一个案子」的顺序。
+
+推荐用流水线出初稿，再人工打磨：
 
 ```bash
-uv run pozhan check cases/你的案件.yaml
+uv run python tools/draft_case.py my-case "一两句话的核心诡计和背景"   # 初稿写到 cases/drafts/
+uv run pozhan check cases/drafts/my-case.yaml                         # 校验
+POZHAN_CASE=cases/drafts/my-case.yaml uv run python evals/selfplay.py 10   # AI 自对弈：能不能破、会不会编造
 ```
 
-校验器会检查：每条谎言恰好有一张卡能戳破、至少有一张干扰卡、档位数等于矛盾数加一、每条矛盾都有失言提示，等等。
+人工审读、改好以后，再移到 `cases/` 下并加进 `index.txt`。
+
+校验器会检查：每条谎言恰好有一张卡能戳破；至少有一张干扰卡；隐藏证词的解锁链条完整、话题不重复、例句够用；间接证据不能同时是能戳破的卡；每条矛盾都有失言提示，等等。
 
 ## 开发
 

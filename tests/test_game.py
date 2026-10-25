@@ -131,3 +131,33 @@ async def test_presentations_get_no_filler(case):
     await say(game, "开始")
     reply, _ = await say(game, "用2号卡反驳证词1")
     assert reply.startswith("😠证词一被戳破了！")
+
+
+async def test_next_case_switches_and_lists_cases(case):
+    from dataclasses import replace
+
+    from pozhan.engine import CommandKind
+    from pozhan.intent.rules import match
+
+    other = replace(case, id="other", title="另一个案子")
+    game = Game(
+        case=case,
+        cases=(case, other),
+        interpreter=Interpreter(RuleMatcher(), None),
+        director=Director(None, ""),
+        store=MemoryStore(),
+    )
+    assert match("换个案子", case).kind is CommandKind.NEXT_CASE
+    assert match("有哪些案子", case).kind is CommandKind.LIST_CASES
+    await say(game, "开始审讯")
+    assert game.case_of(game.store.get("k")).id == case.id
+    listing, _ = await say(game, "有哪些案子")
+    assert "一，年会夜的金表；二，另一个案子" in listing and "第一个" in listing
+    await say(game, "用2号卡反驳证词1")
+    reply, _ = await say(game, "下一个案子")
+    session = game.store.get("k")
+    assert session.case_id == "other" and session.state.broken == () and reply.startswith("😌")
+    await say(game, "重新开始")
+    assert game.case_of(session).id == "other"  # 重新开始重玩当前这个
+    await say(game, "下一个案子")
+    assert game.case_of(session).id == case.id  # 最后一个之后回到第一个

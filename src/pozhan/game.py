@@ -5,7 +5,7 @@ import contextlib
 import re
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 
 from pozhan.case.model import Case
 from pozhan.director import narrator
@@ -15,6 +15,7 @@ from pozhan.engine.outcomes import (
     Answer,
     Briefing,
     Broke,
+    CaseList,
     Confession,
     Lawyer,
     Outcome,
@@ -84,8 +85,11 @@ class Game:
         log: GameLog | None = None,
         clock: Callable[[], float] = time.time,
         screen: ScreenHub | None = None,
+        cases: Sequence[Case] = (),
     ) -> None:
-        self.case = case
+        # 案件库（#53）：每局记住自己在审哪个案子。case 是新局默认的案子，也是案件库的第一个
+        self.cases = (case, *(c for c in cases if c.id != case.id))
+        self.case = self.cases[0]
         self.interpreter = interpreter
         self.director = director
         self.store = store
@@ -93,20 +97,28 @@ class Game:
         self.clock = clock
         self.screen = screen
 
+    def case_of(self, session: Session) -> Case:
+        return next((c for c in self.cases if c.id == session.case_id), self.cases[0])
+
+    def _next_case(self, case: Case) -> Case:
+        i = next(i for i, c in enumerate(self.cases) if c.id == case.id)
+        return self.cases[(i + 1) % len(self.cases)]
+
     def _publish(self, session: Session) -> None:
         if self.screen is not None:
-            self.screen.publish(session.key, build_snapshot(self.case, session, self.clock()))
+            self.screen.publish(session.key, build_snapshot(self.case_of(session), session, self.clock()))
 
     def _mark(self, session: Session, outcome: Outcome | Clarify, prev_stage: int, now: float) -> None:
         """把陪玩屏关心的关键事件记到会话上（#38）。字段只放公开信息。"""
         state = session.state
+        case = self.case_of(session)
         event: dict | None = None
         match outcome:
             case Briefing():
                 session.line, session.ended_at = None, None
                 event = {"kind": "briefing"}
             case Broke(contradiction=x) | Confession(contradiction=x):
-                claim, card = self.case.claim(x.claim), self.case.card(x.card)
+                claim, card = case.claim(x.claim), case.card(x.card)
                 event = {
                     "kind": "confession" if isinstance(outcome, Confession) else "broke",
                     "claim": state.label(x.claim),  # 玩家口中的序号（#46）
@@ -114,14 +126,14 @@ class Game:
                     "card": x.card,
                     "cardTitle": card.title if card else "",
                     "cardText": card.text if card else "",
-                    "fromStage": self.case.stages[prev_stage].name,
-                    "toStage": self.case.stages[state.stage].name,
+                    "fromStage": case.stages[prev_stage].name,
+                    "toStage": case.stages[state.stage].name,
                 }
             case Revealed(claim=claim_id):
                 event = {
                     "kind": "revealed",
                     "claim": state.label(claim_id),
-                    "claimText": self.case.claim(claim_id).text,
+                    "claimText": case.claim(claim_id).text,
                 }
             case Weak(card=card, claim=claim):
                 event = {"kind": "weak", "card": card, "claim": state.label(claim)}
@@ -160,6 +172,7 @@ class Game:
     ) -> AsyncIterator[str]:
         t0 = time.monotonic()
         now = self.clock()
+        case = self.case_of(session)
         prev_stage = session.state.stage if session.state else 0
         spec: _Speculation | None = None
         event: Event | Clarify
@@ -171,23 +184,29 @@ class Game:
             return
 
         if session.state is None:
-            session.state = new_game(self.case, now)
+            session.state = new_game(case, now)
             event = Command(CommandKind.START)
-        elif (matched := self.interpreter.match(text, self.case)) is not None:
+        elif (matched := self.interpreter.match(text, case)) is not None:
             event = matched
+            if event == Command(CommandKind.NEXT_CASE):
+                # 换下一个案子（#53）：和「重新开始」一样开新局，只是换了案子
+                case = self._next_case(case)
+                session.case_id = case.id
+                session.state = new_game(case, now)
+                event = Command(CommandKind.RESTART)
         else:
             if not session.state.over:
-                guess_state, guess = apply(self.case, session.state, Ask(text), now)
-                spec = _Speculation(self.director, self.case, guess_state, guess, session)
+                guess_state, guess = apply(case, session.state, Ask(text), now)
+                spec = _Speculation(self.director, case, guess_state, guess, session)
                 pending.append(spec)
                 if _likely_question(text):
                     # 大概率是提问：不等分类，先把情绪和语气词发出去，灵矽立刻开始合成（#50）。
                     # 万一分类结果是出示，就是嫌疑人「嗯」了一声之后旁白接话，代价很小
-                    early = self.director.emoji(self.case, session.state, Answer(text))
-                    early_filler = self.director.filler(self.case, session.state, len(session.history) // 2)
+                    early = self.director.emoji(case, session.state, Answer(text))
+                    early_filler = self.director.filler(case, session.state, len(session.history) // 2)
                     yield early
                     yield early_filler
-            event = await self.interpreter.classify(text, self.case, session.state)
+            event = await self.interpreter.classify(text, case, session.state)
             if spec is not None and event != Ask(text):
                 await spec.cancel()
                 spec = None
@@ -199,9 +218,12 @@ class Game:
         else:
             if isinstance(event, Clarify):
                 outcome = event
+            elif event == Command(CommandKind.LIST_CASES):
+                ids = [c.id for c in self.cases]
+                outcome = CaseList(tuple(c.title for c in self.cases), ids.index(case.id))
             else:
-                session.state, outcome = apply(self.case, session.state, event, now)
-            lines = self.director.speak(self.case, session.state, outcome, session.history)
+                session.state, outcome = apply(case, session.state, event, now)
+            lines = self.director.speak(case, session.state, outcome, session.history)
 
         if isinstance(outcome, Briefing) and (not session.game_id or event == Command(CommandKind.RESTART)):
             session.game_id = uuid.uuid4().hex[:8]
@@ -216,7 +238,7 @@ class Game:
         self._mark(session, outcome, prev_stage, now)
         self._publish(session)
 
-        emoji = early or self.director.emoji(self.case, session.state, outcome)
+        emoji = early or self.director.emoji(case, session.state, outcome)
         if early is None:
             yield emoji
         parts: list[str] = []
@@ -228,9 +250,7 @@ class Game:
             if early:
                 yield Line("suspect", early_filler)
             elif isinstance(outcome, Answer):
-                yield Line(
-                    "suspect", self.director.filler(self.case, session.state, len(session.history) // 2)
-                )
+                yield Line("suspect", self.director.filler(case, session.state, len(session.history) // 2))
             async for line in lines:
                 yield line
 
