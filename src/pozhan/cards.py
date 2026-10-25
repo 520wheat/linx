@@ -3,9 +3,14 @@
 线索卡是实体卡（Proposal #3 决策 4），开局摆在桌上，玩家「拍卡」出示。
 """
 
+import base64
 from html import escape
+from pathlib import Path
 
 from pozhan.case.model import Case
+
+# 线索卡插图（#63）：和陪玩屏共用一份；内嵌成 data URI，打印用的 HTML 单独发出去也能看到图
+ART = Path(__file__).with_name("screen") / "static" / "img"
 
 CSS = """
 @page { size: A4; margin: 10mm; }
@@ -23,6 +28,12 @@ body { margin: 0; color: #1c1917;
 .card h2 { font-size: 20pt; margin: 2mm 0 5mm; }
 .card p { font-size: 15pt; line-height: 1.7; margin: 0; }
 .card .case { position: absolute; bottom: 6mm; right: 8mm; font-size: 9pt; color: #a8a29e; }
+.card.has-art { padding: 7mm 7mm; }
+.has-art .no { font-size: 34pt; margin: 2mm 0 0; }
+.has-art .no small { font-size: 16pt; }
+.has-art .art { width: 100%; height: 56mm; object-fit: cover; border-radius: 3mm; margin: 3mm 0 3mm; }
+.has-art h2 { font-size: 17pt; margin: 0 0 2mm; }
+.has-art p { font-size: 12.5pt; line-height: 1.6; }
 .help h2 { font-size: 18pt; }
 .help ol { font-size: 12.5pt; line-height: 1.75; padding-left: 6mm; margin: 0; }
 .help b { font-weight: 700; }
@@ -31,12 +42,21 @@ body { margin: 0; color: #1c1917;
 """
 
 
+def _art(case: Case, card_id: int) -> str:
+    path = ART / case.id / f"card-{card_id}.jpg"
+    if not path.exists():
+        return ""
+    data = base64.b64encode(path.read_bytes()).decode()
+    return f'<img class="art" alt="" src="data:image/jpeg;base64,{data}">'
+
+
 def _card(case: Case, card_id: int, title: str, text: str) -> str:
+    art = _art(case, card_id)
     return (
-        '<div class="card">'
+        f'<div class="card{" has-art" if art else ""}">'
         '<div class="tag">线 索 卡</div>'
         f'<div class="no">{card_id}<small>号卡</small></div>'
-        f"<h2>{escape(title)}</h2><p>{escape(text)}</p>"
+        f"{art}<h2>{escape(title)}</h2><p>{escape(text)}</p>"
         f'<div class="case">《破绽》· {escape(case.title)}</div>'
         "</div>"
     )
