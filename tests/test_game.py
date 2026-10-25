@@ -72,3 +72,27 @@ async def test_rule_hits_do_not_speculate(case):
     await say(game, "开始")
     await say(game, "念一下证词")
     assert llm.streams == 0
+
+
+async def test_empty_recognition_does_not_advance_or_call_the_model(case):
+    llm = SlowLLM('{"present": false}')
+    game = make_game(case, llm)
+    await say(game, "开始")
+    before = game.store.get("k").state
+    reply, _ = await say(game, "  。")
+    assert reply == "😶刚才没听清，能再说一遍吗？"
+    assert game.store.get("k").state == before and llm.streams == 0
+
+
+async def test_interrupted_turn_cancels_speculation_and_frees_the_session(case):
+    llm = SlowLLM('{"present": false}')
+    game = make_game(case, llm)
+    await say(game, "开始")
+    gen = game.turn("k", "你那天晚上干嘛去了")
+    assert await gen.__anext__() == "😌"  # 平台收到情绪 emoji 后，玩家打断了
+    await gen.aclose()
+    await asyncio.sleep(0.01)
+    assert not game.store.get("k").lock.locked()
+    assert llm.cancelled == 1  # 后台的投机生成被取消，没有残留任务
+    reply, _ = await say(game, "念一下证词")  # 下一轮照常处理
+    assert reply.startswith("😶证词一")
