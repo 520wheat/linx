@@ -1,8 +1,9 @@
-window.CASE = {
+const CASE = {
   name: "午夜便利店",
   suspect: "陈默",
   seconds: 8 * 60,
   key: ["receipt", "cam"],
+  hint: "破绽：小票 21:03 结账，监控 21:02 人还在小区门口。",
   clues: [
     { id: "receipt", title: "便利店小票", body: "21:03 结账，只买了一包烟。", tag: "物证" },
     { id: "cam", title: "小区监控", body: "21:02 单元门口拍到陈默。", tag: "影像" },
@@ -18,3 +19,6 @@ window.CASE = {
     confess: "行了。我九点前还在小区，进店的时候人已经倒了。我怕被看见，才编了这套。"
   }
 };
+
+if (typeof window !== "undefined") window.CASE = CASE;
+if (typeof module !== "undefined" && module.exports) module.exports = CASE;
