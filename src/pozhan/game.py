@@ -235,7 +235,8 @@ class Game:
                 yield line
 
         async for line in with_filler(lines):
-            t_first = t_first or time.monotonic() - t0
+            if t_first is None:
+                t_first = time.monotonic() - t0
             parts.append(line.text)
             if line.speaker == "suspect":
                 suspect_parts.append(line.text)
