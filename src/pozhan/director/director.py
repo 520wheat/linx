@@ -3,7 +3,15 @@ from dataclasses import dataclass
 
 from pozhan.case.model import Case
 from pozhan.director import narrator
-from pozhan.director.suspect import Suspect, fallback, task_answer, task_broke, task_confess, task_wrong
+from pozhan.director.suspect import (
+    Suspect,
+    fallback,
+    task_answer,
+    task_broke,
+    task_confess,
+    task_weak,
+    task_wrong,
+)
 from pozhan.engine.outcomes import (
     AlreadyBroken,
     Answer,
@@ -20,6 +28,7 @@ from pozhan.engine.outcomes import (
     Revealed,
     Rules,
     UnknownRef,
+    Weak,
     Wrong,
 )
 from pozhan.engine.state import Interrogation
@@ -29,7 +38,7 @@ from pozhan.llm.client import LLM, Message
 NEUTRAL = "😶"  # 只有旁白说话的回合用中性情绪
 
 # 这些结果里嫌疑人会开口，本轮情绪取嫌疑人当前档位
-_SUSPECT_SPEAKS = (Briefing, Answer, Broke, Confession, Wrong, Revealed)
+_SUSPECT_SPEAKS = (Briefing, Answer, Broke, Confession, Wrong, Revealed, Weak)
 
 
 @dataclass(frozen=True)
@@ -105,6 +114,10 @@ class Director:
                 async for line in self._suspect(case, state, task_wrong(case, card, claim), history):
                     yield line
                 yield say(narrator.countdown(left))
+            case Weak(card=card, claim=claim, reason=reason):
+                yield say(narrator.weak(state.label(claim)))
+                async for line in self._suspect(case, state, task_weak(case, card, claim, reason), history):
+                    yield line
             case AlreadyBroken(claim=claim):
                 yield say(narrator.already_broken(state.label(claim)))
             case UnknownRef(card=card, claim=claim):

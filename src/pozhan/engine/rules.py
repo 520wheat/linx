@@ -21,6 +21,7 @@ from pozhan.engine.outcomes import (
     Revealed,
     Rules,
     UnknownRef,
+    Weak,
     Wrong,
 )
 from pozhan.engine.state import Interrogation, Phase
@@ -129,6 +130,11 @@ def _present(case: Case, state: Interrogation, event: Present) -> tuple[Interrog
     # 玩家说的是「第几条说出口的证词」；还没说出口的序号和不存在的一样处理，不扣机会
     claim_id = state.claim_at(event.claim)
     card_missing = case.card(event.card) is None
+    hit = None if card_missing or claim_id is None else case.contradiction(event.card, claim_id)
+    if not event.explicit and (hit is None or claim_id in state.broken):
+        # 提问时顺口提到了卡：没驳倒就当普通提问，不扣次数，也不念「已经被戳破」（#49）
+        return _ask(case, state, Ask(event.text))
+
     if card_missing or claim_id is None:
         return state, UnknownRef(
             card=event.card if card_missing else None,
@@ -138,7 +144,8 @@ def _present(case: Case, state: Interrogation, event: Present) -> tuple[Interrog
     if claim_id in state.broken:
         return state, AlreadyBroken(claim_id)
 
-    hit = case.contradiction(event.card, claim_id)
+    if hit is None and (weak := case.weak_evidence(event.card, claim_id)) is not None:
+        return state, Weak(card=event.card, claim=claim_id, reason=weak.reason)
     if hit is None:
         strikes = state.strikes + 1
         if strikes >= case.limits.strikes:

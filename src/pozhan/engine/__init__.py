@@ -21,6 +21,7 @@ from pozhan.engine.outcomes import (
     Revealed,
     Rules,
     UnknownRef,
+    Weak,
     Wrong,
 )
 from pozhan.engine.rules import apply, new_game, open_topics
@@ -50,6 +51,7 @@ __all__ = [
     "Revealed",
     "Rules",
     "UnknownRef",
+    "Weak",
     "Wrong",
     "apply",
     "new_game",

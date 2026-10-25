@@ -44,6 +44,11 @@ TOPICS = """
 
 LETTERS = "ABCDEFGH"
 
+# 明确表示「我要出示」的说法（#49）。没有这些说法、只是在提问里提到卡的内容，驳不倒时不扣次数
+_EXPLICIT = re.compile(
+    r"出示|拿出|亮出|反驳|看看?这|这张|用.{0,12}(?:卡|报告|记录|截图|照片|清单)|[0-9一二三四五六七八九十]号"
+)
+
 
 def topic_map(case: Case, state: Interrogation) -> dict[str, int]:
     """话题字母 → 隐藏证词编号。只列现在问到就会说出口的那几条。"""
@@ -91,7 +96,7 @@ def parse_reply(raw: str, text: str, topics: dict[str, int] | None = None):
     confidence = data.get("confidence")
     confident = not isinstance(confidence, int | float) or confidence >= CONFIDENCE_FLOOR
     if card is not None and claim is not None and confident:
-        return Present(card=card, claim=claim, text=text)
+        return Present(card=card, claim=claim, text=text, explicit=bool(_EXPLICIT.search(text)))
     return (card, claim)
 
 

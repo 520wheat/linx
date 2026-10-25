@@ -11,7 +11,18 @@ from pozhan.case.model import Case
 from pozhan.director import narrator
 from pozhan.director.director import NEUTRAL, Director, Line
 from pozhan.engine.events import Ask, Command, CommandKind, Event
-from pozhan.engine.outcomes import Briefing, Broke, Confession, Lawyer, Outcome, Quit, Repeat, Revealed, Wrong
+from pozhan.engine.outcomes import (
+    Briefing,
+    Broke,
+    Confession,
+    Lawyer,
+    Outcome,
+    Quit,
+    Repeat,
+    Revealed,
+    Weak,
+    Wrong,
+)
 from pozhan.engine.rules import apply, new_game
 from pozhan.engine.state import Interrogation
 from pozhan.gamelog import GameLog
@@ -104,6 +115,8 @@ class Game:
                     "claim": state.label(claim_id),
                     "claimText": self.case.claim(claim_id).text,
                 }
+            case Weak(card=card, claim=claim):
+                event = {"kind": "weak", "card": card, "claim": state.label(claim)}
             case Wrong(card=card, claim=claim, strikes_left=left):
                 event = {"kind": "wrong", "card": card, "claim": state.label(claim), "strikesLeft": left}
             case Lawyer(reason=reason):

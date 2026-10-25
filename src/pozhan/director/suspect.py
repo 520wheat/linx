@@ -93,6 +93,13 @@ def task_wrong(case: Case, card_id: int, claim_id: int) -> str:
     )
 
 
+def task_weak(case: Case, card_id: int, claim_id: int, reason: str) -> str:
+    return (
+        f"侦探出示了{_card_text(case, card_id)}，想反驳你的证词{_claim_text(case, claim_id)}。"
+        f"这张卡沾边，但证明不了你在撒谎：{reason}抓住这一点轻松挡回去，什么都不要承认。"
+    )
+
+
 def task_confess(case: Case, x: Contradiction) -> str:
     confession = case.suspect.confession or x.concession
     return (

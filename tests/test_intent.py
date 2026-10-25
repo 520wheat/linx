@@ -69,8 +69,11 @@ def test_falls_through_to_model(case, text):
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ('{"present": true, "card": "2", "claim": "1号", "confidence": 0.9}', Present(2, 1, "t")),
-        ('```json\n{"present": true, "card": 4, "claim": 3}\n```', Present(4, 3, "t")),
+        (
+            '{"present": true, "card": "2", "claim": "1号", "confidence": 0.9}',
+            Present(2, 1, "t", explicit=False),
+        ),
+        ('```json\n{"present": true, "card": 4, "claim": 3}\n```', Present(4, 3, "t", explicit=False)),
         ('{"present": false, "card": null, "claim": null}', Ask("t")),
         ('{"present": true, "card": 2, "claim": null, "confidence": 0.9}', (2, None)),
         ('{"present": true, "card": 2, "claim": 1, "confidence": 0.3}', (2, 1)),
@@ -107,7 +110,9 @@ async def test_rule_hits_never_call_the_model(case):
 
 async def test_model_presentation_and_clarify(case):
     it = Interpreter(RuleMatcher(), LLMClassifier(FakeLLM('{"present": true, "card": 2, "claim": 1}'), "m"))
-    assert await it.interpret("电梯监控拍到你上了18楼", case) == Present(2, 1, "电梯监控拍到你上了18楼")
+    # 只是陈述卡的内容，没说「出示」「用……卡」：算顺口提到（#49）
+    text = "电梯监控拍到你上了18楼"
+    assert await it.interpret(text, case) == Present(2, 1, text, explicit=False)
     it = Interpreter(
         RuleMatcher(), LLMClassifier(FakeLLM('{"present": true, "card": null, "claim": null}'), "m")
     )
@@ -117,3 +122,18 @@ async def test_model_presentation_and_clarify(case):
 async def test_model_failure_degrades_to_question(case):
     it = Interpreter(RuleMatcher(), LLMClassifier(FakeLLM(LLMError("timeout")), "m"))
     assert await it.interpret("你到底去没去十八楼", case) == Ask("你到底去没去十八楼")
+
+
+@pytest.mark.parametrize(
+    ("text", "explicit"),
+    [
+        ("出示便利贴照片", True),
+        ("用指纹报告反驳他", True),
+        ("看这张，电梯监控拍到你了", True),
+        ("拿出电梯截图", True),
+        ("九点二十到九点五十没人点歌，你那半小时在干嘛？", False),
+        ("表盒上为什么有你的指纹", False),
+    ],
+)
+def test_explicit_presentation_wording(text, explicit):
+    assert parse_reply('{"present": true, "card": 2, "claim": 1}', text).explicit is explicit

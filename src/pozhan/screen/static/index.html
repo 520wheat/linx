@@ -546,6 +546,8 @@ body.portrait #cluesBtn { display: none; }
         renderMoment(ev);
         momentUntil = Date.now() + 3000;
         setTimeout(() => show(chooseScene()), 3050);
+      } else if (!first && ev.kind === "weak") {
+        toast([document.createTextNode(`${ev.card} 号卡驳不倒证词${cn(ev.claim)}，`), el("b", null, "不够硬"), document.createTextNode(" · 不扣次数")]);
       } else if (!first && ev.kind === "revealed") {
         toast([document.createTextNode("新证词 "), el("b", null, pad(ev.claim)), document.createTextNode(`：${ev.claimText}`)]);
       } else if (!first && ev.kind === "wrong") {

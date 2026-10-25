@@ -30,6 +30,9 @@ class Present:
     card: int
     claim: int
     text: str = ""
+    # 玩家明确表示「我要出示」（报了编号，或说了出示、用……卡、反驳）。只是提问时顺口提到卡的内容为 False：
+    # 驳倒了照样算，驳不倒就当普通提问，不扣次数（#49）
+    explicit: bool = True
 
 
 @dataclass(frozen=True)

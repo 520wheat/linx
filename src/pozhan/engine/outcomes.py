@@ -59,6 +59,15 @@ class Wrong:
 
 
 @dataclass(frozen=True)
+class Weak:
+    """出示的是间接证据：沾边但驳不倒，不扣机会（#49）。claim 是案件里的证词编号。"""
+
+    card: int
+    claim: int
+    reason: str
+
+
+@dataclass(frozen=True)
 class UnknownRef:
     """提到了不存在的卡，或还没说出口的证词序号，不扣机会。claim 是玩家说的序号。"""
 
@@ -117,6 +126,7 @@ Outcome = (
     | Confession
     | AlreadyBroken
     | Wrong
+    | Weak
     | UnknownRef
     | Lawyer
     | ReadClaims

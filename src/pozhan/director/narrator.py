@@ -95,6 +95,10 @@ def wrong(claim_id: int) -> str:
     return f"这张卡驳不倒证词{cn(claim_id)}。"
 
 
+def weak(claim_label: int) -> str:
+    return f"这张卡说明了点什么，但还不够硬，驳不倒证词{cn(claim_label)}。这次不算出示错误。"
+
+
 def countdown(strikes_left: int) -> str:
     return f"律师还有{cn(strikes_left)}次就到。"
 
