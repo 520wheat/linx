@@ -34,6 +34,8 @@ def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str,
             "suspect": {"name": case.suspect.name},
         },
         "rulesText": {"strikes": case.limits.strikes, "minutes": case.limits.minutes},
+        # 线索卡内容本来就印在玩家手里的卡上，不算剧透；网页开玩的玩家没有实体卡，要在屏幕上看（#43）
+        "cards": [{"id": c.id, "title": c.title, "text": c.text, "used": False} for c in case.cards],
     }
     if state is None:
         snap["scene"] = "briefing"
@@ -65,7 +67,9 @@ def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str,
                 }
                 for c in case.claims
             ],
-            "cards": [{"id": c.id, "title": c.title, "used": c.id in used_cards} for c in case.cards],
+            "cards": [
+                {"id": c.id, "title": c.title, "text": c.text, "used": c.id in used_cards} for c in case.cards
+            ],
             "stages": [s.name for s in case.stages],
             "stage": {"index": state.stage, "name": stage.name, "tone": stage.tone},
             "lawyer": {

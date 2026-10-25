@@ -110,6 +110,19 @@ async def test_no_spoilers_before_the_end(client_for):
     assert [t["cardTitle"] for t in final["result"]["timeline"]][1] == "电梯监控截图"
 
 
+async def test_card_texts_are_on_screen_from_the_start(client_for):
+    # 网页开玩的玩家没有实体卡，开局前就要能在屏幕上看到卡面（#43）
+    case, hub, app = make()
+    http = client_for(app)
+    before = (await http.get("/screen/state")).json()
+    assert [c["text"] for c in before["cards"]] == [c.text for c in case.cards]
+    assert not any(c["used"] for c in before["cards"])
+    await say(http, "开始审讯")
+    await say(http, "用二号卡反驳证词一")
+    used = {c["id"]: c["used"] for c in hub.published[-1]["cards"]}
+    assert used == {1: False, 2: True, 3: False, 4: False}
+
+
 async def test_losing_result(client_for):
     _, hub, app = make()
     http = client_for(app)
