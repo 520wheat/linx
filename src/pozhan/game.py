@@ -15,7 +15,6 @@ from pozhan.engine.outcomes import (
     Answer,
     Briefing,
     Broke,
-    CaseList,
     Confession,
     Hint,
     Lawyer,
@@ -107,7 +106,9 @@ class Game:
 
     def _publish(self, session: Session) -> None:
         if self.screen is not None:
-            self.screen.publish(session.key, build_snapshot(self.case_of(session), session, self.clock()))
+            self.screen.publish(
+                session.key, build_snapshot(self.case_of(session), session, self.clock(), self.cases)
+            )
 
     def _mark(self, session: Session, outcome: Outcome | Clarify, prev_stage: int, now: float) -> None:
         """把陪玩屏关心的关键事件记到会话上（#38）。字段只放公开信息。"""
@@ -187,11 +188,17 @@ class Game:
             return
 
         matched = self.interpreter.match(text, case)
-        if session.state is None and matched == Command(CommandKind.LIST_CASES):
-            # 还没开局就问有哪些案子：只念列表，不开局（#53）
-            yield NEUTRAL + narrator.case_list(tuple(c.title for c in self.cases), 0)
-            return
-        if matched == Command(CommandKind.NEXT_CASE):
+        if isinstance(matched, Command) and matched.kind is CommandKind.SELECT_CASE:
+            # 切到指定案子（#67）：和「下一个案子」一样开新局
+            chosen = next((c for c in self.cases if c.id == matched.case_id), None)
+            if chosen is None:
+                yield NEUTRAL + "没有这个案子。"
+                return
+            case = chosen
+            session.case_id = case.id
+            session.state = new_game(case, now)
+            event = Command(CommandKind.RESTART)
+        elif matched == Command(CommandKind.NEXT_CASE):
             # 换下一个案子（#53）：和「重新开始」一样开新局，只是换了案子
             case = self._next_case(case)
             session.case_id = case.id
@@ -226,9 +233,6 @@ class Game:
         else:
             if isinstance(event, Clarify):
                 outcome = event
-            elif event == Command(CommandKind.LIST_CASES):
-                ids = [c.id for c in self.cases]
-                outcome = CaseList(tuple(c.title for c in self.cases), ids.index(case.id))
             else:
                 session.state, outcome = apply(case, session.state, event, now)
             lines = self.director.speak(case, session.state, outcome, session.history)

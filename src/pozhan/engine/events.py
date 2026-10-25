@@ -14,9 +14,9 @@ class CommandKind(StrEnum):
     REPEAT = "repeat"  # 再说一遍
     QUIT = "quit"  # 结束游戏
     NEXT_CASE = "next_case"  # 下一个案子（#53）
-    LIST_CASES = "list_cases"  # 有哪些案子（#53）
     HINT = "hint"  # 给点提示（#55）
     TRUTH = "truth"  # 讲讲真相（#55）
+    SELECT_CASE = "select_case"  # 切换到指定案子（#67）
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,7 @@ class Present:
 class Command:
     kind: CommandKind
     card: int | None = None  # 仅 READ_CARD 使用
+    case_id: str | None = None  # 仅 SELECT_CASE 使用
 
 
 Event = Ask | Present | Command

@@ -104,7 +104,9 @@ def create_app(
 
     def current_snapshot(device: str | None) -> dict:
         key = screen.resolve(device) if screen else None
-        snap = (screen.latest(key) if screen else None) or build_snapshot(game.case, None, time.time())
+        snap = (screen.latest(key) if screen else None) or build_snapshot(
+            game.case, None, time.time(), game.cases
+        )
         # hub 里存的是发布时刻的快照；前端用 serverNow 校准倒计时，所以这里换成当前时间
         return {**snap, "serverNow": time.time()}
 

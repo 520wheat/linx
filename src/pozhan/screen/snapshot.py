@@ -4,6 +4,7 @@
 前端拿不到，也就不可能泄露。
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 from pozhan.case.model import Case
@@ -24,10 +25,14 @@ def _card_title(case: Case, card_id: int | None) -> str:
     return card.title if card else ""
 
 
-def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str, Any]:
+def build_snapshot(
+    case: Case, session: Session | None, now: float, cases: Sequence[Case] = ()
+) -> dict[str, Any]:
     state = session.state if session else None
+    library = [{"id": c.id, "title": c.title} for c in (cases or (case,))]
     snap: dict[str, Any] = {
         "serverNow": now,
+        "library": library,
         "case": {
             "id": case.id,
             "title": case.title,

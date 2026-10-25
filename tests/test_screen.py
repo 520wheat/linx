@@ -140,6 +140,7 @@ async def test_state_endpoint_token_and_device(client_for):
     assert (await http.get("/screen/state?token=bad")).status_code == 401
     idle = (await http.get("/screen/state?token=t0k")).json()
     assert idle["scene"] == "briefing" and idle["case"]["title"] == "年会夜的金表"
+    assert idle["library"][0]["id"] == idle["case"]["id"]
 
     await say(http, "开始", device="aa:bb")
     await say(http, "开始", device="cc:dd")
@@ -230,6 +231,10 @@ async def test_screen_follows_the_case_switch(client_for):
     await say(http, "下一个案子")
     assert hub.published[-1]["case"]["title"] == "另一个案子"
     assert hub.published[-1]["event"]["kind"] == "briefing"
+    await say(http, "切换到案子 golden-watch")
+    last = hub.published[-1]
+    assert last["case"]["id"] == "golden-watch" and last["event"]["kind"] == "briefing"
+    assert [c["id"] for c in last["library"]] == ["golden-watch", "other"]
 
 
 async def test_root_redirects_to_web_play_keeping_the_token(client_for):
