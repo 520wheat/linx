@@ -3,6 +3,8 @@
 先走规则匹配（零延迟），不命中再交给大模型分类（Proposal #3 决策 2）。
 """
 
-from pozhan.intent.interpreter import Clarify, Interpreter, LLMClassifier, RuleMatcher
+from pozhan.intent.classifier import LLMClassifier
+from pozhan.intent.interpreter import Clarify, Interpreter
+from pozhan.intent.rules import RuleMatcher
 
 __all__ = ["Clarify", "Interpreter", "LLMClassifier", "RuleMatcher"]
