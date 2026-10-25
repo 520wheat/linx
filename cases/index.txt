@@ -1,4 +1,6 @@
 # 案件库的顺序（#53）：「开始审讯」从第一个开始，「下一个案子」按顺序往下换。没列出的案件按文件名排在后面。
+# 新手教学关放在最前面（#57）
+missing-pudding
 golden-watch
 livestream-bracelet
 library-badge
