@@ -5,10 +5,11 @@ import json
 import httpx
 
 from pozhan.cli import build_app
+from tests.conftest import GOLDEN_WATCH
 
 
 async def _post(payload: dict) -> httpx.Response:
-    transport = httpx.ASGITransport(app=build_app())
+    transport = httpx.ASGITransport(app=build_app(str(GOLDEN_WATCH)))
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         return await client.post("/v1/chat/completions", json=payload)
 
@@ -31,7 +32,7 @@ async def test_stream_reply_is_openai_sse():
 
 
 async def test_models_endpoint():
-    transport = httpx.ASGITransport(app=build_app())
+    transport = httpx.ASGITransport(app=build_app(str(GOLDEN_WATCH)))
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.get("/v1/models")
     assert r.json()["data"][0]["id"] == "pozhan"
