@@ -12,6 +12,7 @@ from pozhan.director import narrator
 from pozhan.director.director import NEUTRAL, Director, Line
 from pozhan.engine.events import Ask, Command, CommandKind, Event
 from pozhan.engine.outcomes import (
+    Answer,
     Briefing,
     Broke,
     Confession,
@@ -33,6 +34,13 @@ from pozhan.session.store import Session, SessionStore
 
 _DONE = object()
 _PUNCT_ONLY = re.compile(r"[\s\W_]+")
+# 看起来是在提问、又没有出示的说法：不等意图分类，先发语气词（#50）
+_QUESTION = re.compile(r"[？?]\s*$|吗|呢|为什么|为啥|怎么|什么|谁|哪|几点|多久|多少")
+_PRESENTING = re.compile(r"出示|拿出|亮出|反驳|这张|号卡|[0-9一二三四五六七八九十]号")
+
+
+def _likely_question(text: str) -> bool:
+    return bool(_QUESTION.search(text)) and not _PRESENTING.search(text)
 
 
 class _Speculation:
@@ -155,6 +163,7 @@ class Game:
         prev_stage = session.state.stage if session.state else 0
         spec: _Speculation | None = None
         event: Event | Clarify
+        early: str | None = None  # 分类之前就先发出去的「情绪 + 语气词」
 
         if session.state is not None and not _PUNCT_ONLY.sub("", text):
             # 识别结果为空（设备没听清）：不推进状态，不调用大模型（#24）
@@ -171,6 +180,13 @@ class Game:
                 guess_state, guess = apply(self.case, session.state, Ask(text), now)
                 spec = _Speculation(self.director, self.case, guess_state, guess, session)
                 pending.append(spec)
+                if _likely_question(text):
+                    # 大概率是提问：不等分类，先把情绪和语气词发出去，灵矽立刻开始合成（#50）。
+                    # 万一分类结果是出示，就是嫌疑人「嗯」了一声之后旁白接话，代价很小
+                    early = self.director.emoji(self.case, session.state, Answer(text))
+                    early_filler = self.director.filler(self.case, session.state, len(session.history) // 2)
+                    yield early
+                    yield early_filler
             event = await self.interpreter.classify(text, self.case, session.state)
             if spec is not None and event != Ask(text):
                 await spec.cancel()
@@ -200,13 +216,27 @@ class Game:
         self._mark(session, outcome, prev_stage, now)
         self._publish(session)
 
-        emoji = self.director.emoji(self.case, session.state, outcome)
-        yield emoji
+        emoji = early or self.director.emoji(self.case, session.state, outcome)
+        if early is None:
+            yield emoji
         parts: list[str] = []
         suspect_parts: list[str] = []
-        t_first = None
-        async for line in lines:
-            t_first = t_first or time.monotonic() - t0
+        t_first = 0.0 if early else None
+
+        async def with_filler(lines: AsyncIterator[Line]) -> AsyncIterator[Line]:
+            # 嫌疑人用大模型回答的轮次，先说一个语气词（#50）；已经提前发过的只记账，不再发
+            if early:
+                yield Line("suspect", early_filler)
+            elif isinstance(outcome, Answer):
+                yield Line(
+                    "suspect", self.director.filler(self.case, session.state, len(session.history) // 2)
+                )
+            async for line in lines:
+                yield line
+
+        async for line in with_filler(lines):
+            if t_first is None:
+                t_first = time.monotonic() - t0
             parts.append(line.text)
             if line.speaker == "suspect":
                 suspect_parts.append(line.text)
@@ -218,6 +248,8 @@ class Game:
                 # 嫌疑人开口之后，同一轮里的旁白（「他还在坚持……」）不再覆盖字幕
                 session.line = {"speaker": line.speaker, "text": line.text, "turn": t0}
                 self._publish(session)
+            if early and len(parts) == 1:
+                continue  # 提前发过的语气词
             yield line.text
 
         spoken = "".join(parts)

@@ -177,3 +177,25 @@ def test_narrator_voice_from_the_model_is_blocked():
     assert violation("证词四被戳破了！", may_confess=False) == "narrator-voice"
     assert violation("他只能让步：承认下午没碰过表盒", may_confess=False) == "narrator-voice"
     assert violation("你们这证据说明不了什么。", may_confess=False) is None
+
+
+async def test_opening_is_short_and_full_rules_come_on_demand(case):
+    from pozhan.director import narrator
+    from pozhan.engine import Briefing
+
+    out = await lines(Director(llm=None, model=""), case, new_game(case, 0), Briefing())
+    assert out[-1].text == narrator.quick_rules()
+    assert "律师" not in "".join(x.text for x in out)  # 律师规则等第一次出示错误时再说
+    assert len("".join(x.text for x in out)) < 220
+
+
+async def test_first_wrong_presentation_explains_the_lawyer(case):
+    from pozhan.engine import Present, apply
+
+    d = Director(llm=None, model="")
+    state, out = apply(case, new_game(case, 0), Present(card=1, claim=2), 1)
+    texts = [x.text for x in await lines(d, case, state, out)]
+    assert "律师就会到场" in "".join(texts)
+    state, out = apply(case, state, Present(card=1, claim=3), 2)
+    texts = [x.text for x in await lines(d, case, state, out)]
+    assert "律师就会到场" not in "".join(texts)

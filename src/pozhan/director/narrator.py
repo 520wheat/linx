@@ -38,6 +38,16 @@ def rules(case: Case) -> str:
     )
 
 
+def quick_rules() -> str:
+    """开场只给开始行动所需的一句话玩法，其余规则用到时再说（#50）。"""
+    return "随便问；找到破绽，就说用几号卡反驳证词几。想听完整规则就说「规则」。"
+
+
+def lawyer_rule(case: Case) -> str:
+    """第一次出示错误时补上律师规则：这时玩家最需要知道代价。"""
+    return f"出示错{cn(case.limits.strikes)}次，或者审讯超过{cn(case.limits.minutes)}分钟，律师就会到场。"
+
+
 def briefing(case: Case) -> str:
     return case.briefing
 

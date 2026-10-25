@@ -1,6 +1,7 @@
 """整局时延评测：用真实模型、经过完整的 OpenAI 兼容接口打一局，统计每轮「收到请求 → 第一段台词」的时间。
 
-不经过灵矽，衡量的是我们自己这一段的延迟（#22）。
+不经过灵矽，衡量的是我们自己这一段的延迟（#22）。服务跑在本机的真实端口上：
+httpx 的 ASGITransport 会把流式响应攒齐了才返回，用它测出来的「首段」其实是整轮总时长。
 需要环境变量 LLM_BASE_URL、LLM_API_KEY。
 用法：uv run python evals/play_latency.py [脚本文件，默认 scripts/win.txt]
 """
@@ -12,6 +13,7 @@ import time
 from pathlib import Path
 
 import httpx
+import uvicorn
 
 from pozhan.cli import build_app
 from pozhan.config import Settings
@@ -25,9 +27,12 @@ async def main(script: Path) -> None:
     lines = [ln.strip() for ln in script.read_text(encoding="utf-8").splitlines()]
     lines = [ln for ln in lines if ln and not ln.startswith("#")]
     firsts = []
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://t", timeout=60
-    ) as http:
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning"))
+    task = asyncio.create_task(server.serve())
+    while not server.started:
+        await asyncio.sleep(0.02)
+    port = server.servers[0].sockets[0].getsockname()[1]
+    async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}", timeout=60) as http:
         for text in lines:
             body = {"model": "pozhan", "stream": True, "messages": [{"role": "user", "content": text}]}
             t0 = time.monotonic()
@@ -43,6 +48,8 @@ async def main(script: Path) -> None:
             total = time.monotonic() - t0
             firsts.append(first or total)
             print(f"[首段 {first or 0:4.2f}s / 全部 {total:4.2f}s] {text}\n    → {reply[:90]}")
+    server.should_exit = True
+    await task
     s = sorted(firsts)
     print(f"\n首段时延 p50 {s[len(s) // 2]:.2f}s，最大 {s[-1]:.2f}s（共 {len(s)} 轮）")
 

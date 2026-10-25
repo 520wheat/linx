@@ -51,7 +51,7 @@ async def test_question_reuses_the_speculative_answer(case):
     game = make_game(case, llm)
     await say(game, "开始")
     reply, elapsed = await say(game, "你那天晚上干嘛去了")
-    assert reply == "😌我一直在包厢。"
+    assert reply == "😌这个嘛……我一直在包厢。"  # 先说语气词（#50）
     assert llm.streams == 1  # 只生成了一次回答
     assert elapsed < 0.5  # 分类和生成并行：约 0.3s，而不是串行的 0.6s
 
@@ -108,3 +108,26 @@ async def test_history_keeps_only_the_suspects_own_words(case):
     assert assistant[1] == "我一直在包厢。"
     assert assistant[2] == "……"
     assert not any("被戳破" in a for a in assistant[1:])
+
+
+async def test_likely_question_gets_emotion_and_filler_before_classification(case):
+    # 分类要 0.3 秒；看起来是提问的话，情绪和语气词立刻发出（#50）
+    llm = SlowLLM('{"present": false}')
+    game = make_game(case, llm)
+    await say(game, "开始")
+    t0 = time.monotonic()
+    chunks = []
+    async for part in game.turn("k", "你九点半在哪？"):
+        chunks.append((part, time.monotonic() - t0))
+    assert [p for p, _ in chunks[:2]] == ["😌", "这个嘛……"]
+    assert chunks[1][1] < 0.1
+    assert "".join(p for p, _ in chunks) == "😌这个嘛……我一直在包厢。"
+    history = game.store.get("k").history
+    assert history[-1]["content"] == "这个嘛……我一直在包厢。"
+
+
+async def test_presentations_get_no_filler(case):
+    game = make_game(case, SlowLLM('{"present": false}'))
+    await say(game, "开始")
+    reply, _ = await say(game, "用2号卡反驳证词1")
+    assert reply.startswith("😠证词一被戳破了！")
