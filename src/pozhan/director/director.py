@@ -37,6 +37,15 @@ from pozhan.llm.client import LLM, Message
 
 NEUTRAL = "😶"  # 只有旁白说话的回合用中性情绪
 
+# 嫌疑人开口前的语气词，按档位的情绪选（#50）：零延迟先发出去，灵矽马上就能开始合成，
+# 大模型的回答随后接上。同一局里轮换，不连着重复
+FILLERS = {
+    "😌": ("嗯，", "这个嘛，", "警官，"),
+    "😠": ("哼，", "我说，", "又来了，"),
+    "😲": ("我、我……", "这……", "那个……"),
+    "😭": ("呜……",),
+}
+
 # 这些结果里嫌疑人会开口，本轮情绪取嫌疑人当前档位
 _SUSPECT_SPEAKS = (Briefing, Answer, Broke, Confession, Wrong, Revealed, Weak)
 
@@ -58,6 +67,10 @@ class Director:
         if isinstance(outcome, _SUSPECT_SPEAKS):
             return case.stages[min(state.stage, len(case.stages) - 1)].emoji
         return NEUTRAL
+
+    def filler(self, case: Case, state: Interrogation, turn: int) -> str:
+        options = FILLERS.get(case.stages[min(state.stage, len(case.stages) - 1)].emoji, ("嗯，",))
+        return options[turn % len(options)]
 
     async def _suspect(
         self,
@@ -87,7 +100,7 @@ class Director:
             case Briefing():
                 yield say(narrator.briefing(case))
                 yield Line("suspect", narrator.opening_statement(case))
-                yield say(narrator.rules(case))
+                yield say(narrator.quick_rules())
             case Answer(question=q, slip=slip):
                 async for line in self._suspect(case, state, task_answer(q, slip), history):
                     yield line
@@ -113,6 +126,8 @@ class Director:
                 yield say(narrator.wrong(state.label(claim)))
                 async for line in self._suspect(case, state, task_wrong(case, card, claim), history):
                     yield line
+                if state.strikes == 1:
+                    yield say(narrator.lawyer_rule(case))
                 yield say(narrator.countdown(left))
             case Weak(card=card, claim=claim, reason=reason):
                 yield say(narrator.weak(state.label(claim)))
