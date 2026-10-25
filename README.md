@@ -97,7 +97,7 @@ uv run pytest
 uv run ruff check
 ```
 
-- 架构：模块划分与接口契约见设计 Issue #4。`engine` 是纯规则状态机，只有 `intent` 和 `director` 调用大模型。
+- 架构：见 [docs/architecture.md](docs/architecture.md)。模块划分与接口契约见设计 Issue #4。`engine` 是纯规则状态机，只有 `intent` 和 `director` 调用大模型。
 - 评测：在 `evals/` 下，需要真实模型。
   - `intent_eval.py`：意图解析准确率；
   - `suspect_eval.py`：嫌疑人台词与诱供话术；
