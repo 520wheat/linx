@@ -2,9 +2,506 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>破绽 · 陪玩屏</title>
+<style>
+/* 视觉方向：#36 设计稿「方向 B · 证物板」柔和版。只用系统字体：国内电视、盒子常常加载不到外部字体。 */
+:root {
+  --bg: #F0F2F4; --card: #FFFFFF; --line: #E2E7EC; --chip: #E2E7EC; --muted-card: #E8ECF0; --soft: #F6F8F9;
+  --ink: #2A3644; --ink-2: #4A5664; --ink-3: #5A6675; --ink-4: #7C8896;
+  --solid: #D9825B; --tint: #F6E4DA; --accent-ink: #8A3E1C;
+  --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+:root[data-accent="sage"] { --solid: #7FA08E; --tint: #E3EDE7; --accent-ink: #2F5A44; }
+:root[data-accent="mist"] { --solid: #7E9BB8; --tint: #E1E9F1; --accent-ink: #2C4E70; }
+:root[data-accent="amber"] { --solid: #CFA055; --tint: #F4EBD9; --accent-ink: #6E4E14; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+body { color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.mono { font-family: var(--mono); }
+
+/* 画面按 1600×900 布局，再等比缩放到视口 */
+#stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform-origin: center; }
+.scene { position: absolute; inset: 0; padding: 36px 56px; display: flex; flex-direction: column; gap: 24px;
+  opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s linear .35s; }
+.scene.active { opacity: 1; visibility: visible; transition: opacity .35s ease; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.tag { padding: 5px 10px; border-radius: 6px; background: var(--chip); color: var(--ink-2);
+  font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .08em; }
+.label { font-size: 14px; color: var(--ink-3); letter-spacing: .15em; }
+.brand { font-size: 32px; font-weight: 900; letter-spacing: .06em; }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.brandrow { display: flex; align-items: center; gap: 18px; }
+.case-title { font-size: 18px; font-weight: 500; color: var(--ink-2); }
+
+.lawyer { display: flex; align-items: center; gap: 24px; padding: 10px 14px 10px 20px; }
+.pips { display: flex; gap: 5px; }
+.pip { width: 16px; height: 16px; border-radius: 4px; background: var(--ink-4); }
+.pip.spent { background: transparent; border: 2px solid #D3DAE1; }
+.clock { font-family: var(--mono); font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; padding-right: 6px; }
+.clock.low { color: var(--accent-ink); }
+.divider { width: 1px; height: 26px; background: var(--line); }
+.small { font-size: 15px; color: var(--ink-3); }
+
+/* 审讯中 */
+.grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 440px minmax(0, 1fr); gap: 28px; }
+.dossier { display: flex; flex-direction: column; overflow: hidden; }
+.mug { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; background-color: #F6F8F9;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 47px, #E4E9EE 47px, #E4E9EE 48px); }
+.ruler { position: absolute; top: 14px; right: 16px; bottom: 14px; display: flex; flex-direction: column; justify-content: space-between;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-4); }
+.avatar { width: 160px; height: 160px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--chip); color: var(--ink-2); font-size: 72px; font-weight: 900; transition: background .5s, color .5s; }
+.nameplate { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 24px; border-top: 1px solid var(--line); }
+.nameplate b { font-size: 30px; font-weight: 900; }
+.defense { display: flex; flex-direction: column; gap: 14px; padding: 4px 24px 24px; }
+.defense .head { display: flex; align-items: baseline; justify-content: space-between; }
+.pills { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pill { display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 8px; font-size: 17px;
+  background: var(--soft); color: var(--ink-3); transition: background .4s, color .4s; }
+.pill.past { background: var(--muted-card); color: var(--ink-2); }
+.pill.now { background: var(--tint); color: var(--accent-ink); font-weight: 900; box-shadow: inset 0 0 0 1.5px var(--solid); }
+
+.claims { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.claims .head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px; }
+.claims .head b { font-size: 20px; }
+.claim { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 24px; padding: 22px 24px;
+  transition: background .4s; }
+.claim .no { display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); }
+.claim .no small { font-size: 12px; letter-spacing: .1em; color: var(--ink-3); }
+.claim .no span { font-size: 34px; font-weight: 700; }
+.claim p { margin: 0; font-size: 24px; line-height: 1.45; font-weight: 500; }
+.claim .sub { font-size: 15px; color: var(--ink-2); font-weight: 400; margin-top: 6px; }
+.claim.broken { background: var(--muted-card); border-color: transparent; }
+.claim.broken .no span { color: var(--ink-4); }
+.claim.broken p.text { color: var(--ink-3); font-weight: 400; text-decoration: line-through; text-decoration-color: var(--solid); text-decoration-thickness: 2px; }
+.status { padding: 7px 14px; border-radius: 999px; background: var(--bg); color: var(--ink-2); font-size: 15px; white-space: nowrap; }
+.status.broken { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; background: var(--tint); color: var(--accent-ink); font-size: 16px; font-weight: 700; }
+.status.broken i { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: #FFFFFF; font-family: var(--mono); font-size: 14px; font-style: normal; }
+.cards { margin-top: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.clue { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: var(--card);
+  border: 1px solid var(--line); font-size: 16px; min-width: 0; }
+.clue b { font-family: var(--mono); color: var(--ink-3); }
+.clue.used { background: var(--muted-card); border-color: transparent; color: var(--ink-3); }
+
+.subtitle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 24px; padding: 20px 28px; min-height: 84px; }
+.speaker { padding: 6px 12px; border-radius: 6px; background: var(--tint); color: var(--accent-ink); font-size: 15px; font-weight: 700; white-space: nowrap; }
+.speaker.narrator { background: var(--chip); color: var(--ink-2); }
+.subtitle p { margin: 0; font-size: 26px; line-height: 1.45; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.toast { position: absolute; top: 96px; right: 56px; padding: 14px 20px; border-radius: 12px; background: var(--card);
+  border: 1px solid var(--line); box-shadow: 0 10px 30px -18px rgba(30, 40, 55, .35); font-size: 18px;
+  opacity: 0; transform: translateY(-6px); transition: opacity .3s, transform .3s; pointer-events: none; }
+.toast.show { opacity: 1; transform: none; }
+.toast b { color: var(--accent-ink); }
+
+/* 开局 */
+.brief { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; }
+.brief .story { display: flex; flex-direction: column; justify-content: space-between; padding: 48px 52px; }
+.brief h1 { margin: 22px 0; font-size: 96px; font-weight: 900; line-height: 1.08; letter-spacing: .02em; }
+.brief .story p { margin: 0; max-width: 760px; font-size: 22px; line-height: 1.8; color: var(--ink-2); }
+.who { display: flex; align-items: center; gap: 18px; padding-top: 28px; border-top: 1px solid var(--line); }
+.who .avatar { width: 64px; height: 64px; font-size: 28px; }
+.who b { display: block; font-size: 22px; font-weight: 900; }
+.side { display: flex; flex-direction: column; gap: 20px; }
+.say { display: flex; flex-direction: column; gap: 18px; padding: 36px 40px; border-radius: 14px; background: var(--tint); color: var(--accent-ink); }
+.say .big { display: flex; align-items: center; gap: 16px; font-size: 48px; font-weight: 900; }
+.rules { flex: 1; margin: 0; padding: 32px 40px; list-style: none; display: flex; flex-direction: column; justify-content: center; gap: 26px; }
+.rules li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; align-items: baseline; font-size: 20px; line-height: 1.6; }
+.rules li span { font-family: var(--mono); font-weight: 700; color: var(--ink-4); }
+
+/* 戳破瞬间 */
+.moment { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center; }
+.moment .chip { padding: 6px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line);
+  font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: .12em; color: var(--ink-2); }
+.moment h1 { margin: 0; font-size: 156px; font-weight: 900; line-height: 1; letter-spacing: .04em; color: var(--accent-ink); }
+.scene.active .moment h1 { animation: stamp .45s cubic-bezier(.2, .9, .3, 1.3) both; }
+@keyframes stamp { from { opacity: 0; transform: scale(1.18); } to { opacity: 1; transform: none; } }
+.moment .was { margin: 0; max-width: 1100px; font-size: 30px; line-height: 1.5; color: var(--ink-3);
+  text-decoration: line-through; text-decoration-color: var(--solid); text-decoration-thickness: 3px; }
+.evidence { display: flex; align-items: center; gap: 22px; margin-top: 18px; padding: 18px 28px 18px 18px; text-align: left; }
+.evidence .no { width: 72px; height: 72px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--tint); color: var(--accent-ink); font-family: var(--mono); font-size: 36px; font-weight: 700; }
+.evidence b { display: block; font-size: 20px; margin-bottom: 6px; }
+.evidence span { font-size: 18px; color: var(--ink-2); }
+.shift { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.shift .from { padding: 6px 12px; border-radius: 8px; background: var(--bg); color: var(--ink-3); font-size: 15px; }
+.shift .to { padding: 6px 12px; border-radius: 8px; background: var(--tint); color: var(--accent-ink); font-size: 15px; font-weight: 900; box-shadow: inset 0 0 0 1.5px var(--solid); }
+
+/* 结局 */
+.end { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 28px; }
+.verdict { display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 48px 48px 40px; }
+.verdict .badge { align-self: flex-start; padding: 6px 14px; border-radius: 999px; background: var(--tint); color: var(--accent-ink); font-size: 15px; font-weight: 700; }
+.verdict.lost .badge { background: var(--muted-card); color: var(--ink-2); }
+.verdict h1 { margin: 20px 0 0; font-size: 112px; font-weight: 900; line-height: 1.05; color: var(--accent-ink); }
+.verdict.lost h1 { color: var(--ink); }
+.stats { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.stats div { display: flex; flex-direction: column-reverse; gap: 6px; padding: 18px 20px; border-radius: 12px; background: var(--soft); }
+.stats dt { font-size: 14px; color: var(--ink-3); }
+.stats dd { margin: 0; font-family: var(--mono); font-size: 34px; font-weight: 700; }
+.again { margin: 0; font-size: 18px; color: var(--ink-3); }
+.again b { color: var(--ink); }
+.truth { display: flex; flex-direction: column; gap: 22px; padding: 40px 44px; min-height: 0; }
+.truth .head { display: flex; align-items: baseline; justify-content: space-between; }
+.truth h2 { margin: 0; font-size: 24px; font-weight: 900; }
+.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; overflow: hidden; }
+.steps li { display: grid; grid-template-columns: 76px 16px minmax(0, 1fr); gap: 16px; padding-bottom: 20px; }
+.steps time { font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--accent-ink); }
+.steps time.none { color: var(--ink-4); font-weight: 400; }
+.steps .rail { width: 2px; justify-self: center; background: var(--line); }
+.steps li:last-child .rail { background: transparent; }
+.steps .what { display: flex; flex-direction: column; gap: 6px; font-size: 19px; line-height: 1.6; }
+.steps .what em { align-self: flex-start; padding: 3px 10px; border-radius: 6px; background: var(--bg); font-size: 14px; font-style: normal; color: var(--ink-2); }
+.reveal { margin: auto 0 0; padding: 16px 20px; border-radius: 12px; background: var(--tint); font-size: 17px; line-height: 1.7; color: var(--accent-ink); }
+
+#conn { position: fixed; right: 14px; bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-4);
+  opacity: 0; transition: opacity .3s; }
+#conn.show { opacity: 1; }
+#conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--solid); }
+</style>
 </head>
 <body>
-<p>陪玩屏页面在 #39 实现。</p>
+<div id="stage">
+
+  <!-- 开局 -->
+  <section class="scene" id="scene-briefing" aria-label="开局">
+    <header class="brandrow"><span class="brand">破绽</span><span class="small">语音审讯游戏</span></header>
+    <div class="brief">
+      <div class="card story">
+        <div>
+          <span class="tag">CASE 01</span>
+          <h1 data-bind="title">年会夜的金表</h1>
+          <p data-bind="briefing"></p>
+        </div>
+        <div class="who">
+          <span class="avatar" data-bind="initial">林</span>
+          <div><b data-bind="suspect"></b><span class="small">嫌疑人，就坐在你们对面</span></div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="say">
+          <span class="label" style="color: inherit">对设备说</span>
+          <div class="big">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            「开始审讯」
+          </div>
+        </div>
+        <ol class="card rules">
+          <li><span>01</span>随便提问，听出证词里的破绽。</li>
+          <li><span>02</span>拍出线索卡，说「用 X 号卡反驳证词 Y」。</li>
+          <li><span>03</span><span style="font-family: inherit; font-weight: 400; color: inherit" data-bind="rulesLine">出示错三次，或超过十五分钟，律师就到了。</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 审讯中 -->
+  <section class="scene" id="scene-interrogating" aria-label="审讯中">
+    <header class="top">
+      <div class="brandrow"><span class="brand">破绽</span><span class="tag">CASE 01</span><span class="case-title" data-bind="title"></span></div>
+      <div class="card lawyer">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span class="small">律师还差</span><div class="pips" id="pips" role="img"></div><span class="small">次错误</span>
+        </div>
+        <span class="divider"></span>
+        <span class="clock" id="clock">--:--</span>
+      </div>
+    </header>
+    <div class="grid">
+      <div class="card dossier" aria-label="嫌疑人档案">
+        <div class="mug">
+          <div class="ruler" aria-hidden="true"><span>190</span><span>180</span><span>170</span><span>160</span><span>150</span></div>
+          <span class="avatar" data-bind="initial"></span>
+        </div>
+        <div class="nameplate"><b data-bind="suspect"></b><span class="small">嫌疑人</span></div>
+        <div class="defense">
+          <div class="head"><span class="label">心理防线</span><span class="small" id="tone"></span></div>
+          <div class="pills" id="pills"></div>
+        </div>
+      </div>
+      <div class="claims">
+        <div class="head"><b>证词</b><span class="mono small" id="brokenCount"></span></div>
+        <div id="claimList" style="display: flex; flex-direction: column; gap: 14px"></div>
+        <div class="cards" id="cardList"></div>
+      </div>
+    </div>
+    <footer class="card subtitle">
+      <span class="speaker" id="speaker">旁白</span>
+      <p id="lineText">对设备说话开始审讯。</p>
+      <span class="small" style="white-space: nowrap">出示：「用 X 号卡反驳证词 Y」</span>
+    </footer>
+    <div class="toast" id="toast" role="status"></div>
+  </section>
+
+  <!-- 戳破瞬间 -->
+  <section class="scene" id="scene-broke" aria-label="戳破瞬间">
+    <header class="brandrow"><span class="brand">破绽</span><span class="tag">CASE 01</span><span class="case-title" data-bind="title"></span></header>
+    <div class="moment">
+      <span class="chip" id="mClaim">证词 01</span>
+      <h1>被戳破了</h1>
+      <p class="was" id="mWas"></p>
+      <div class="card evidence"><span class="no" id="mCard">2</span><div><b id="mCardTitle"></b><span id="mCardText"></span></div></div>
+    </div>
+    <footer class="card subtitle">
+      <span class="speaker" id="mSpeaker">旁白</span>
+      <p id="mLine"></p>
+      <div class="shift"><span class="from" id="mFrom"></span>
+        <svg width="24" height="12" viewBox="0 0 24 12" fill="none" aria-hidden="true"><path d="M1 6h20M16 1l5 5-5 5" stroke="#7C8896" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="to" id="mTo"></span></div>
+    </footer>
+  </section>
+
+  <!-- 结局 -->
+  <section class="scene" id="scene-ended" aria-label="结局">
+    <header class="brandrow"><span class="brand">破绽</span><span class="tag">CASE 01</span><span class="case-title" data-bind="title"></span></header>
+    <div class="end">
+      <div class="card verdict" id="verdict">
+        <div><span class="badge" id="vBadge"></span><h1 id="vTitle"></h1></div>
+        <dl class="stats">
+          <div><dt>戳破证词</dt><dd id="sBroken"></dd></div>
+          <div><dt>出示错误</dt><dd id="sStrikes"></dd></div>
+          <div><dt>审讯用时</dt><dd id="sTime"></dd></div>
+        </dl>
+        <p class="again">再来一局，对设备说 <b>「重新开始」</b></p>
+      </div>
+      <div class="card truth" aria-label="真相复盘">
+        <div class="head"><h2>真相</h2><span class="mono small">TIMELINE</span></div>
+        <ol class="steps" id="steps"></ol>
+        <p class="reveal" id="reveal"></p>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="conn" role="status"><i></i><span>正在重新连接…</span></div>
+
+<script>
+"use strict";
+(() => {
+  const params = new URLSearchParams(location.search);
+  const accent = params.get("accent");
+  if (accent) document.documentElement.dataset.accent = accent;
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const CN = "零一二三四五六七八九十";
+  const cn = (n) => (n <= 10 ? CN[n] : n < 20 ? "十" + CN[n - 10] : CN[Math.floor(n / 10)] + "十" + (n % 10 ? CN[n % 10] : ""));
+  const pad = (n) => String(n).padStart(2, "0");
+  const mmss = (s) => `${pad(Math.floor(Math.max(0, s) / 60))}:${pad(Math.floor(Math.max(0, s) % 60))}`;
+
+  // 按 1600×900 等比缩放到视口
+  const fit = () => {
+    const s = Math.min(innerWidth / 1600, innerHeight / 900);
+    $("stage").style.transform = `translate(-50%, -50%) scale(${s})`;
+  };
+  addEventListener("resize", fit);
+  fit();
+
+  let snap = null;
+  let clockOffset = 0;          // 服务端时间 - 本地时间（秒）
+  let lastEventId = null;       // 已经展示过的事件，刷新页面不重放
+  let momentUntil = 0;          // 「戳破瞬间」显示到什么时候
+  let toastTimer = 0;
+
+  const show = (scene) => {
+    for (const s of document.querySelectorAll(".scene")) s.classList.toggle("active", s.id === `scene-${scene}`);
+  };
+
+  const bindAll = (key, value) => {
+    for (const n of document.querySelectorAll(`[data-bind="${key}"]`)) n.textContent = value;
+  };
+
+  const speakerName = (line) => (line && line.speaker === "suspect" ? snap.case.suspect.name : "旁白");
+
+  function renderCommon() {
+    const c = snap.case;
+    bindAll("title", c.title);
+    bindAll("briefing", c.briefing);
+    bindAll("suspect", c.suspect.name);
+    bindAll("initial", c.suspect.name.slice(0, 1));
+    const r = snap.rulesText;
+    bindAll("rulesLine", `出示错${cn(r.strikes)}次，或超过${cn(r.minutes)}分钟，律师就到了。`);
+  }
+
+  function renderInterrogation() {
+    const law = snap.lawyer;
+    const left = law.limit - law.strikes;
+    const pips = $("pips");
+    pips.replaceChildren(...Array.from({ length: law.limit }, (_, i) => el("span", i < left ? "pip" : "pip spent")));
+    pips.setAttribute("aria-label", `还能出示错 ${left} 次，共 ${law.limit} 次`);
+
+    $("tone").textContent = snap.stage.tone.split("，")[0];
+    $("pills").replaceChildren(...snap.stages.map((name, i) =>
+      el("span", "pill" + (i === snap.stage.index ? " now" : i < snap.stage.index ? " past" : ""), name)));
+
+    const broken = snap.claims.filter((c) => c.status === "broken").length;
+    $("brokenCount").textContent = `BROKEN ${broken} / ${snap.claims.length}`;
+    $("claimList").replaceChildren(...snap.claims.map((c) => {
+      const row = el("article", "card claim" + (c.status === "broken" ? " broken" : ""));
+      const no = el("span", "no");
+      no.append(el("small", null, "证词"), el("span", null, pad(c.id)));
+      const body = el("div");
+      body.append(el("p", "text", c.text));
+      if (c.brokenBy) body.append(el("p", "sub", `→ ${c.brokenBy.concession}`));
+      let status;
+      if (c.brokenBy) {
+        status = el("span", "status broken");
+        status.append(el("i", null, String(c.brokenBy.card)), document.createTextNode("已戳破"));
+      } else {
+        status = el("span", "status", "坚持中");
+      }
+      row.append(no, body, status);
+      return row;
+    }));
+
+    $("cardList").replaceChildren(...snap.cards.map((card) => {
+      const n = el("span", "clue" + (card.used ? " used" : ""));
+      n.append(el("b", null, String(card.id)), document.createTextNode(card.used ? `${card.title} · 已用` : card.title));
+      return n;
+    }));
+
+    const line = snap.line;
+    $("speaker").textContent = line ? speakerName(line) : "旁白";
+    $("speaker").className = "speaker" + (line && line.speaker === "suspect" ? "" : " narrator");
+    $("lineText").textContent = line ? line.text : "随便提问，或者拍出线索卡反驳证词。";
+  }
+
+  function renderMoment(ev) {
+    $("mClaim").textContent = `证词 ${pad(ev.claim)}`;
+    $("mWas").textContent = ev.claimText;
+    $("mCard").textContent = String(ev.card);
+    $("mCardTitle").textContent = ev.cardTitle;
+    $("mCardText").textContent = ev.cardText;
+    $("mFrom").textContent = ev.fromStage;
+    $("mTo").textContent = ev.toStage;
+    const line = snap.line && snap.line.speaker === "suspect" ? snap.line : null;
+    $("mSpeaker").textContent = line ? snap.case.suspect.name : "旁白";
+    $("mSpeaker").className = "speaker" + (line ? "" : " narrator");
+    $("mLine").textContent = line ? line.text : `证词${CN[ev.claim] || ev.claim}被戳破了！`;
+  }
+
+  function renderEnded() {
+    const r = snap.result;
+    $("verdict").classList.toggle("lost", !r.won);
+    $("vBadge").textContent = r.won ? `${snap.case.suspect.name}认罪了` : r.phase === "quit" ? "本局已结束" : "他不会再开口了";
+    $("vTitle").textContent = r.won ? "案件告破" : r.phase === "quit" ? "结束审讯" : "律师到了";
+    $("sBroken").textContent = `${r.broken}/${r.claimCount}`;
+    $("sStrikes").textContent = String(r.strikes);
+    $("sTime").textContent = mmss(r.elapsedSeconds);
+    $("steps").replaceChildren(...r.timeline.map((t) => {
+      const li = el("li");
+      const time = el("time", t.time ? null : "none", t.time || "—");
+      const what = el("span", "what");
+      what.append(el("span", null, t.text));
+      if (t.cardTitle) what.append(el("em", null, `${CN[t.card] || t.card}号卡 · ${t.cardTitle}`));
+      li.append(time, el("span", "rail"), what);
+      return li;
+    }));
+    // 时间线已经讲清经过，这里只留揭晓文字的最后一句（动机），避免重复
+    const sentences = r.reveal.split("。").filter((s) => s.trim());
+    $("reveal").textContent = r.timeline.length && sentences.length > 1 ? `动机：${sentences.pop()}。` : r.reveal;
+  }
+
+  function tick() {
+    if (!snap || !snap.lawyer || snap.scene !== "interrogating") return;
+    const now = Date.now() / 1000 + clockOffset;
+    const left = snap.lawyer.startedAt + snap.lawyer.limitSeconds - now;
+    $("clock").textContent = mmss(left);
+    $("clock").classList.toggle("low", left < 120);
+  }
+  setInterval(tick, 1000);
+
+  function toast(html) {
+    const t = $("toast");
+    t.replaceChildren(...html);
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+  }
+
+  function chooseScene() {
+    if (Date.now() < momentUntil) return "broke";
+    return snap.scene;
+  }
+
+  function apply(next) {
+    const first = snap === null;
+    snap = next;
+    clockOffset = snap.serverNow - Date.now() / 1000;
+    renderCommon();
+    if (snap.claims) renderInterrogation();
+    if (snap.result) renderEnded();
+
+    // 只播放页面打开之后发生的事件：刷新或重连时不重放旧的「戳破瞬间」
+    const ev = snap.event;
+    if (ev && ev.id !== lastEventId) {
+      lastEventId = ev.id;
+      if (!first && (ev.kind === "broke" || ev.kind === "confession")) {
+        renderMoment(ev);
+        momentUntil = Date.now() + 3000;
+        setTimeout(() => show(chooseScene()), 3050);
+      } else if (!first && ev.kind === "wrong") {
+        toast([document.createTextNode(`这张卡驳不倒证词${cn(ev.claim)} · 律师还差 `), el("b", null, String(ev.strikesLeft)), document.createTextNode(" 次")]);
+      }
+    }
+    // ?preview=broke：把最近一次戳破定格在屏幕上，供截图和排版检查使用
+    if (params.get("preview") === "broke" && ev && ev.kind === "broke") momentUntil = Infinity;
+    if (Date.now() < momentUntil && ev && (ev.kind === "broke" || ev.kind === "confession")) renderMoment(ev);
+    show(chooseScene());
+    tick();
+  }
+
+  function connect() {
+    const q = new URLSearchParams();
+    for (const k of ["token", "device"]) if (params.get(k)) q.set(k, params.get(k));
+    // 相对页面路径计算接口地址：挂在反向代理的子路径下也能用
+    const base = location.pathname.replace(/\/?$/, "/");
+    let lostTimer = 0;
+    const ok = () => { clearTimeout(lostTimer); lostTimer = 0; $("conn").classList.remove("show"); };
+    // 断开超过 2 秒才提示，避免网络抖动时闪烁
+    const lost = () => { if (!lostTimer) lostTimer = setTimeout(() => $("conn").classList.add("show"), 2000); };
+
+    let gotAny = false;
+    const es = new EventSource(`${base}events?${q}`);
+    es.onmessage = (m) => { gotAny = true; ok(); apply(JSON.parse(m.data)); };
+    es.onerror = lost;  // EventSource 会自动重连
+
+    // 有些代理和隧道会缓冲流式响应（例如 Cloudflare 临时隧道不支持 SSE），
+    // 4 秒内一条推送都没收到，就改为每 0.8 秒轮询一次状态接口
+    setTimeout(() => {
+      if (gotAny) return;
+      es.close();
+      let lastJson = "";
+      const poll = async () => {
+        try {
+          const r = await fetch(`${base}state?${q}`, { cache: "no-store" });
+          if (!r.ok) throw new Error(String(r.status));
+          const next = await r.json();
+          ok();
+          clockOffset = next.serverNow - Date.now() / 1000;
+          const key = JSON.stringify({ ...next, serverNow: 0 });  // 只有内容变了才重新渲染
+          if (key !== lastJson) { lastJson = key; apply(next); }
+        } catch {
+          lost();
+        }
+        setTimeout(poll, 800);
+      };
+      poll();
+    }, 4000);
+  }
+
+  show("briefing");
+  connect();
+})();
+</script>
 </body>
 </html>

@@ -188,11 +188,14 @@ class Game:
         async for line in lines:
             t_first = t_first or time.monotonic() - t0
             parts.append(line.text)
-            if session.line and session.line["speaker"] == line.speaker and session.line.get("turn") == t0:
+            same_turn = session.line is not None and session.line.get("turn") == t0
+            if same_turn and session.line["speaker"] == line.speaker:
                 session.line = {**session.line, "text": session.line["text"] + line.text}
-            else:
+                self._publish(session)
+            elif not (same_turn and session.line["speaker"] == "suspect"):
+                # 嫌疑人开口之后，同一轮里的旁白（「他还在坚持……」）不再覆盖字幕
                 session.line = {"speaker": line.speaker, "text": line.text, "turn": t0}
-            self._publish(session)
+                self._publish(session)
             yield line.text
 
         spoken = "".join(parts)

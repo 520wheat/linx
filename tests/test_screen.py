@@ -167,3 +167,31 @@ async def test_events_stream_initial_snapshot_and_updates():
     finally:
         server.should_exit = True
         await task
+
+
+async def test_subtitle_keeps_the_suspect_line_over_trailing_narration(client_for):
+    _, hub, app = make()
+    http = client_for(app)
+    await say(http, "开始审讯")
+    await say(http, "用二号卡反驳证词一")
+    assert hub.published[-1]["line"]["speaker"] == "suspect"
+
+
+async def test_subscription_survives_idle_timeouts():
+    hub = ScreenHub()
+    q = hub.subscribe("*")
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(q.get(), timeout=0.05)  # 空闲超时（发 keepalive 的时机）
+    hub.publish("k", {"scene": "briefing"})
+    assert (await asyncio.wait_for(q.get(), timeout=1))["scene"] == "briefing"  # 超时之后仍能收到推送
+    hub.unsubscribe("*", q)
+    hub.publish("k", {"scene": "ended"})
+    assert q.empty()
+
+
+def test_device_subscription_before_first_publish():
+    hub = ScreenHub()
+    q = hub.subscribe("aa:bb")  # 屏幕先打开，设备还没说话
+    hub.publish("x-linx-device-id:cc:dd", {"n": 1})
+    hub.publish("x-linx-device-id:aa:bb", {"n": 2})
+    assert q.get_nowait() == {"n": 2} and q.empty()
