@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import json
 import logging
@@ -8,10 +9,11 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from pozhan.game import Game
 from pozhan.llm.client import Message
+from pozhan.screen import ANY, PAGE, ScreenHub, build_snapshot
 from pozhan.session.store import SessionKeyResolver
 
 MODEL_ID = "pozhan"
@@ -63,6 +65,8 @@ def create_app(
     *,
     api_key: str = "",
     request_log: str | Path | None = None,
+    screen: ScreenHub | None = None,
+    screen_token: str = "",
 ) -> FastAPI:
     """api_key 非空时要求 Authorization: Bearer <api_key>（即灵矽「我的模型」里填的 API 密钥）。
 
@@ -86,6 +90,56 @@ def create_app(
             f.write(
                 json.dumps({"ts": time.time(), "headers": headers, "body": body}, ensure_ascii=False) + "\n"
             )
+
+    def screen_allowed(request: Request) -> bool:
+        if not screen_token:
+            return True
+        given = request.query_params.get("token") or request.headers.get("authorization", "").removeprefix(
+            "Bearer "
+        )
+        return hmac.compare_digest(given.strip(), screen_token)
+
+    def current_snapshot(device: str | None) -> dict:
+        key = screen.resolve(device) if screen else None
+        return (screen.latest(key) if screen else None) or build_snapshot(game.case, None, time.time())
+
+    @app.get("/screen")
+    async def screen_page():
+        # 页面本身不含对局数据，数据接口才校验令牌；页面从自己的 URL 里取 token 去请求数据
+        return FileResponse(PAGE, media_type="text/html; charset=utf-8")
+
+    @app.get("/screen/state")
+    async def screen_state(request: Request):
+        if not screen_allowed(request):
+            return _error(401, "invalid screen token")
+        return current_snapshot(request.query_params.get("device"))
+
+    @app.get("/screen/events")
+    async def screen_events(request: Request):
+        if not screen_allowed(request):
+            return _error(401, "invalid screen token")
+        if screen is None:
+            return _error(404, "screen disabled")
+        device = request.query_params.get("device")
+        channel = (screen.resolve(device) or device) if device else ANY
+
+        async def events() -> AsyncIterator[str]:
+            yield f"data: {json.dumps(current_snapshot(device), ensure_ascii=False)}\n\n"
+            updates = screen.subscribe(channel)
+            try:
+                while True:
+                    try:
+                        snap = await asyncio.wait_for(anext(updates), timeout=15)
+                    except TimeoutError:
+                        yield ": keepalive\n\n"  # 让反向代理和隧道不因空闲断开连接
+                        continue
+                    yield f"data: {json.dumps(snap, ensure_ascii=False)}\n\n"
+            finally:
+                await updates.aclose()
+
+        return StreamingResponse(
+            events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+        )
 
     @app.get("/healthz")
     async def healthz() -> dict:

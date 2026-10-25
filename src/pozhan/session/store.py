@@ -19,6 +19,11 @@ class Session:
     history: list[Message] = field(default_factory=list)  # 服务端自己保存对话，不依赖平台传来的历史
     updated_at: float = field(default_factory=time.time)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    # 陪玩屏展示用（#38）：最近一次关键事件、最近一句台词、对局结束时间
+    event: dict[str, Any] | None = None
+    event_seq: int = 0
+    line: dict[str, str] | None = None
+    ended_at: float | None = None
 
     def remember(self, user: str, assistant: str) -> None:
         self.history += [{"role": "user", "content": user}, {"role": "assistant", "content": assistant}]
