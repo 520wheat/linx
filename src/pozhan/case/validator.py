@@ -63,6 +63,10 @@ def validate(case: Case) -> list[Problem]:
         if not x.slip:
             add("has-slip", f"矛盾（卡 {x.card} × 证词 {x.claim}）缺少失言提示 slip")
 
+    for step in case.timeline:
+        if step.card is not None and step.card not in card_ids:
+            add("refs-exist", f"时间线「{step.text[:12]}」引用了不存在的线索卡 {step.card}")
+
     if case.limits.strikes < 1 or case.limits.minutes < 1:
         add("limits", "律师倒计时的次数和分钟数都必须大于 0")
 

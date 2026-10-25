@@ -83,3 +83,18 @@ def test_missing_field_is_reported(case_data):
 def test_folded_yaml_spaces_between_chinese_sentences_are_removed(case):
     assert "。 " not in case.briefing and "不见了。监控显示" in case.briefing
     assert "KTV 包厢" in case.briefing  # 中英文之间的空格保留
+
+
+def test_timeline_is_loaded(case):
+    assert [s.time for s in case.timeline] == ["21:20", "21:32", "", "", "21:55"]
+    assert [s.card for s in case.timeline] == [None, 2, 3, 4, None]
+
+
+def test_timeline_card_must_exist(case_data):
+    case_data["timeline"][1]["card"] = 9
+    assert "refs-exist" in rules(case_data)
+
+
+def test_timeline_is_optional(case_data):
+    del case_data["timeline"]
+    assert parse_case(case_data).timeline == ()
