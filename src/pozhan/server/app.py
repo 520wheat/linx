@@ -8,13 +8,14 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from pozhan.game import Game
 from pozhan.llm.client import Message
 from pozhan.screen import ANY, PAGE, ScreenHub, build_snapshot
 from pozhan.session.store import SessionKeyResolver
+from pozhan.voice import VoiceRelay
 
 MODEL_ID = "pozhan"
 MAX_BODY_BYTES = 1_000_000
@@ -67,6 +68,7 @@ def create_app(
     request_log: str | Path | None = None,
     screen: ScreenHub | None = None,
     screen_token: str = "",
+    voice: VoiceRelay | None = None,
 ) -> FastAPI:
     """api_key 非空时要求 Authorization: Bearer <api_key>（即灵矽「我的模型」里填的 API 密钥）。
 
@@ -109,6 +111,28 @@ def create_app(
     async def screen_page():
         # 页面本身不含对局数据，数据接口才校验令牌；页面从自己的 URL 里取 token 去请求数据
         return FileResponse(PAGE, media_type="text/html; charset=utf-8")
+
+    @app.get("/screen/voice/status")
+    async def voice_status(request: Request):
+        if not screen_allowed(request):
+            return _error(401, "invalid screen token")
+        if voice is None:
+            return {"enabled": False}
+        return {"enabled": True, "busy": voice.busy.locked(), "device": voice.device.mac}
+
+    @app.websocket("/screen/voice")
+    async def voice_ws(ws: WebSocket):
+        # 网页开玩（#43）：网页充当灵矽设备，令牌沿用陪玩屏的只读令牌
+        given = ws.query_params.get("token") or ""
+        if screen_token and not hmac.compare_digest(given, screen_token):
+            await ws.close(code=4401)
+            return
+        await ws.accept()
+        if voice is None:
+            await ws.send_json({"type": "error", "message": "服务端没有配置网页开玩用的灵矽设备"})
+            await ws.close(code=4404)
+            return
+        await voice.serve(ws)
 
     @app.get("/screen/state")
     async def screen_state(request: Request):
