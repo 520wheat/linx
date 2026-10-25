@@ -115,6 +115,11 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .brief .story p { margin: 0; max-width: 760px; font-size: 22px; line-height: 1.8; color: var(--ink-2); }
 .who { display: flex; align-items: center; gap: 18px; padding-top: 28px; border-top: 1px solid var(--line); }
 .who .avatar { width: 64px; height: 64px; font-size: 28px; }
+/* 美术（#61）：案件封面和嫌疑人立绘；图片加载失败时保持原来的首字圆章 */
+.brief .story .cover { width: 100%; height: 250px; object-fit: cover; border-radius: 12px; margin-bottom: 8px; }
+.brief .story .cover[hidden] { display: none; }
+.brief .story:has(.cover:not([hidden])) h1 { margin: 12px 0; font-size: 60px; }
+.avatar.photo { background-size: cover; background-position: center top; font-size: 0 !important; box-shadow: inset 0 0 0 1px var(--line); }
 .who b { display: block; font-size: 22px; font-weight: 900; }
 .side { display: flex; flex-direction: column; gap: 20px; }
 .say { display: flex; flex-direction: column; gap: 18px; padding: 36px 40px; border-radius: 14px; background: var(--tint); color: var(--accent-ink); }
@@ -266,6 +271,7 @@ body.play #sayline { display: block; }
     <header class="brandrow"><span class="brand">破绽</span><span class="small">语音审讯游戏</span></header>
     <div class="brief">
       <div class="card story">
+        <img class="cover" id="cover" alt="" hidden>
         <div>
           <span class="tag">CASE 01</span>
           <h1 data-bind="title">年会夜的金表</h1>
@@ -440,12 +446,34 @@ body.play #sayline { display: block; }
 
   const speakerName = (line) => (line && line.speaker === "suspect" ? snap.case.suspect.name : "旁白");
 
+  // 美术（#61）：按案件 id 取图，取不到就保持首字圆章
+  let artCase = null;
+  function renderArt(caseId) {
+    if (artCase === caseId) return;
+    artCase = caseId;
+    const base = location.pathname.replace(/\/?$/, "/") + "img/" + encodeURIComponent(caseId) + "/";
+    const cover = $("cover");
+    cover.hidden = true;
+    cover.onload = () => { if (artCase === caseId) cover.hidden = false; };
+    cover.onerror = () => { cover.hidden = true; };
+    cover.src = base + "cover.jpg";
+    const avatars = [...document.querySelectorAll(".avatar")];
+    avatars.forEach((a) => { a.classList.remove("photo"); a.style.backgroundImage = ""; });
+    const img = new Image();
+    img.onload = () => {
+      if (artCase !== caseId) return;
+      avatars.forEach((a) => { a.classList.add("photo"); a.style.backgroundImage = `url("${img.src}")`; });
+    };
+    img.src = base + "suspect.jpg";
+  }
+
   function renderCommon() {
     const c = snap.case;
     bindAll("title", c.title);
     bindAll("briefing", c.briefing);
     bindAll("suspect", c.suspect.name);
     bindAll("initial", c.suspect.name.slice(0, 1));
+    renderArt(c.id);
     const r = snap.rulesText;
     bindAll("rulesLine", `出示错${cn(r.strikes)}次，或超过${cn(r.minutes)}分钟，律师就到了。`);
   }

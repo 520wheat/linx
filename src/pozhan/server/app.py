@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from pozhan.game import Game
 from pozhan.llm.client import Message
@@ -112,6 +113,9 @@ def create_app(
         # 直接打开域名时进入网页开玩；带上原来的查询参数（token 等）
         query = request.url.query
         return RedirectResponse("/screen?" + (query if "play=" in query else "play=1&" + query).rstrip("&"))
+
+    # 美术资源（#61）：嫌疑人立绘和案件封面，不含对局数据，不需要令牌
+    app.mount("/screen/img", StaticFiles(directory=PAGE.parent / "img", check_dir=False), name="screen-img")
 
     @app.get("/screen")
     async def screen_page():

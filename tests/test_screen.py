@@ -239,3 +239,17 @@ async def test_root_redirects_to_web_play_keeping_the_token(client_for):
     assert r.status_code == 307 and r.headers["location"] == "/screen?play=1&token=abc"
     r = await http.get("/")
     assert r.headers["location"] == "/screen?play=1"
+
+
+async def test_art_is_served_without_a_token(client_for, tmp_path):
+    # 美术资源不含对局数据（#61）：不需要令牌；不存在的图返回 404，页面会退回首字圆章
+    _, _, app = make(token="secret")
+    http = client_for(app)
+    missing = await http.get("/screen/img/no-such-case/suspect.jpg")
+    assert missing.status_code == 404
+    from pozhan.screen import PAGE
+
+    shipped = sorted((PAGE.parent / "img").glob("*/suspect.jpg"))
+    if shipped:
+        r = await http.get(f"/screen/img/{shipped[0].parent.name}/suspect.jpg")
+        assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
