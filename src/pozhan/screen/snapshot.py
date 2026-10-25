@@ -48,9 +48,10 @@ def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str,
     snap.update(
         {
             "scene": "ended" if state.over else "interrogating",
+            # 只放已经说出口的证词，按说出口的顺序编号；隐藏证词连条数都不透露（#46）
             "claims": [
                 {
-                    "id": c.id,
+                    "id": label,
                     "text": c.text,
                     "status": "broken" if c.id in broken_by else "holding",
                     **(
@@ -65,7 +66,7 @@ def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str,
                         else {}
                     ),
                 }
-                for c in case.claims
+                for label, c in ((i, case.claim(cid)) for i, cid in enumerate(state.revealed, 1))
             ],
             "cards": [
                 {"id": c.id, "title": c.title, "text": c.text, "used": c.id in used_cards} for c in case.cards
@@ -91,7 +92,7 @@ def build_snapshot(case: Case, session: Session | None, now: float) -> dict[str,
             "won": state.phase is Phase.CONFESSED,
             "phase": state.phase.value,
             "broken": len(state.broken),
-            "claimCount": len(case.claims),
+            "claimCount": len(case.contradictions),
             "strikes": state.strikes,
             "elapsedSeconds": max(0, int(ended - state.started_at)),
             "timeline": [

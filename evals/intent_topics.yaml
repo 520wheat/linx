@@ -1,0 +1,26 @@
+# 追问解锁（#46）的话题评测集，案件：cases/golden-watch.yaml 第二版，开局状态（只说了证词一、二）。
+# 现在唯一可问的话题是「保险柜密码」，对应案件里的隐藏证词 4。topic: null 表示不应该解锁。
+# 运行：uv run python evals/intent_eval.py
+
+- {text: 你知道保险柜的密码吗, expect: ask, topic: 4}
+- {text: 老板那个保险柜，密码都有谁知道？, expect: ask, topic: 4}
+- {text: 保险柜平时谁能打开, expect: ask, topic: 4}
+- {text: 你有没有开过老板的保险柜, expect: ask, topic: 4}
+- {text: 密码是不是你帮老板记的, expect: ask, topic: 4}
+- {text: 保险柜是怎么被打开的，你心里没数吗, expect: ask, topic: 4}
+- {text: 你们行政部有没有人知道保险柜怎么开, expect: ask, topic: 4}
+- {text: 那个保险箱的开锁密码你清楚吗, expect: ask, topic: 4}
+- {text: 老板有没有告诉过你保险柜密码, expect: ask, topic: 4}
+- {text: 要打开保险柜得知道什么, expect: ask, topic: 4}
+- {text: 保险柜放在办公室哪个位置, expect: ask, topic: null}
+- {text: 你九点半在哪, expect: ask, topic: null}
+- {text: 你最近是不是缺钱, expect: ask, topic: null}
+- {text: 你和老板关系怎么样, expect: ask, topic: null}
+- {text: 年会上谁抽到了大奖, expect: ask, topic: null}
+- {text: 你平时负责保管什么东西, expect: ask, topic: null}
+- {text: 你在包厢唱了什么歌, expect: ask, topic: null}
+- {text: 金表值多少钱, expect: ask, topic: null}
+- {text: 用2号卡反驳证词1, expect: present, card: 2, claim: 1}
+- {text: 表盒上全是你的指纹，你还说没碰过？, expect: present, card: 4, claim: 2}
+- {text: 电梯监控拍到你九点半上了十八楼, expect: present, card: 2, claim: 1}
+- {text: 指纹报告，反驳第二条, expect: present, card: 4, claim: 2}

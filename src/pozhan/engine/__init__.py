@@ -18,11 +18,12 @@ from pozhan.engine.outcomes import (
     ReadClaims,
     Remaining,
     Repeat,
+    Revealed,
     Rules,
     UnknownRef,
     Wrong,
 )
-from pozhan.engine.rules import apply, new_game
+from pozhan.engine.rules import apply, new_game, open_topics
 from pozhan.engine.state import Interrogation, Phase
 
 __all__ = [
@@ -46,9 +47,11 @@ __all__ = [
     "ReadClaims",
     "Remaining",
     "Repeat",
+    "Revealed",
     "Rules",
     "UnknownRef",
     "Wrong",
     "apply",
     "new_game",
+    "open_topics",
 ]

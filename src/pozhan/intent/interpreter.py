@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from pozhan.case.model import Case
 from pozhan.engine.events import Ask, Event
+from pozhan.engine.state import Interrogation
 from pozhan.intent.classifier import LLMClassifier
 from pozhan.intent.rules import RuleMatcher
 
@@ -23,17 +24,17 @@ class Interpreter:
         """只走规则匹配，零延迟；拿不准时返回 None。"""
         return self.rules.match(text, case)
 
-    async def classify(self, text: str, case: Case) -> Event | Clarify:
-        """规则未命中时的大模型分类；没有配置模型时一律当作提问。"""
+    async def classify(self, text: str, case: Case, state: Interrogation | None = None) -> Event | Clarify:
+        """规则未命中时的大模型分类；没有配置模型时一律当作提问。state 决定证词编号和可问的话题。"""
         if self.classifier is None:
             return Ask(text)
-        result = await self.classifier.classify(text, case)
+        result = await self.classifier.classify(text, case, state)
         if isinstance(result, tuple):
             return Clarify(*result)
         return result
 
-    async def interpret(self, text: str, case: Case) -> Event | Clarify:
+    async def interpret(self, text: str, case: Case, state: Interrogation | None = None) -> Event | Clarify:
         matched = self.match(text, case)
         if matched is not None:
             return matched
-        return await self.classify(text, case)
+        return await self.classify(text, case, state)

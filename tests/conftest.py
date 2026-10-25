@@ -6,7 +6,10 @@ import yaml
 from pozhan.case import Case, load_case
 
 ROOT = Path(__file__).resolve().parent.parent
-GOLDEN_WATCH = ROOT / "cases" / "golden-watch.yaml"
+# 单元测试固定用第一版案件（三条开场证词、没有隐藏证词），案件内容改版不影响规则测试；
+# 追问解锁（#46）用 HIDDEN 这份最小案件单独测
+GOLDEN_WATCH = ROOT / "tests" / "fixtures" / "golden-watch-v1.yaml"
+CASES = sorted((ROOT / "cases").glob("*.yaml"))
 
 
 @pytest.fixture

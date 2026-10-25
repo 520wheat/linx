@@ -23,7 +23,7 @@ from pozhan.llm import OpenAICompatLLM
 ROOT = Path(__file__).resolve().parent.parent
 DETECTIVE_MODEL = os.environ.get("DETECTIVE_MODEL", "deepseek/deepseek-v4.1-flash")
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "deepseek/deepseek-v4.1-flash")
-MAX_TURNS = 25
+MAX_TURNS = 40
 
 DETECTIVE = """你在玩一个语音审讯游戏，你是侦探。每次只输出你要对嫌疑人说的一句话，不要任何解释。
 
@@ -33,7 +33,8 @@ DETECTIVE = """你在玩一个语音审讯游戏，你是侦探。每次只输�
 {cards}
 
 规则：可以随便提问；要反驳证词时说「用X号卡反驳证词Y」；出示错{strikes}次就输了，所以不确定时先多问几句。
-有的卡帮不上忙。目标是戳穿全部证词让嫌疑人认罪。"""
+有的卡帮不上忙。证词会越审越多：被戳穿后他可能改口，问到关键的事他也会说出新证词，旁白会告诉你这是证词几。
+手里的卡对不上现有证词时，就想想这张卡和什么事有关，围绕它追问。目标是戳穿全部证词让嫌疑人认罪。"""
 
 JUDGE = """你是游戏质检员。下面是嫌疑人的设定真相和他开场的证词，以及他在一局游戏里说的若干句话。
 找出嫌疑人说的话里，**编造了下面材料中都没有的、具体的新事实**（新的不在场证明、新的人物、新的地点、新的具体时间、新的具体动作）。

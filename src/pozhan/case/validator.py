@@ -16,6 +16,18 @@ def _duplicates(ids: list[int]) -> list[int]:
     return sorted(i for i, n in Counter(ids).items() if n > 1)
 
 
+def _reachable(case: Case, claim_id: int) -> bool:
+    """沿 unlock.after 往前追，最终要追到一条开场证词，中途不能成环。"""
+    seen: set[int] = set()
+    claim = case.claim(claim_id)
+    while claim is not None and claim.unlock is not None and claim.unlock.after is not None:
+        if claim.id in seen:
+            return False
+        seen.add(claim.id)
+        claim = case.claim(claim.unlock.after)
+    return claim is not None
+
+
 def validate(case: Case) -> list[Problem]:
     """检查案件是否公平、可解。返回空列表表示通过。"""
     problems: list[Problem] = []
@@ -50,10 +62,11 @@ def validate(case: Case) -> list[Problem]:
     if not card_ids - used_cards:
         add("has-distractor", "至少要有一张不能戳破任何证词的干扰卡")
 
-    if len(case.stages) != len(case.contradictions) + 1:
+    # 最后一档留给认罪；其余档位按戳破进度分布（#46），所以档位数不必等于矛盾数 + 1
+    if not 2 <= len(case.stages) <= len(case.contradictions) + 1:
         add(
             "stage-count",
-            f"档位数应为矛盾数 + 1（{len(case.contradictions) + 1}），现在是 {len(case.stages)}",
+            f"档位数应在 2 到矛盾数 + 1（{len(case.contradictions) + 1}）之间，现在是 {len(case.stages)}",
         )
     for s in case.stages:
         if s.slip_every < 1:
@@ -62,6 +75,30 @@ def validate(case: Case) -> list[Problem]:
     for x in case.contradictions:
         if not x.slip:
             add("has-slip", f"矛盾（卡 {x.card} × 证词 {x.claim}）缺少失言提示 slip")
+
+    if not case.opening_claims:
+        add("has-opening", "至少要有一条开场就说出口的证词（不写 unlock）")
+    topics: Counter[str] = Counter()
+    for c in case.claims:
+        u = c.unlock
+        if u is None:
+            continue
+        if u.after is not None and u.after not in claim_ids:
+            add("refs-exist", f"证词 {c.id} 的 unlock.after 引用了不存在的证词 {u.after}")
+        if u.after == c.id:
+            add("unlock-cycle", f"证词 {c.id} 不能在自己被戳破之后解锁")
+        if not u.topic and u.after is None:
+            add("unlock-empty", f"证词 {c.id} 的 unlock 至少要写 topic 或 after")
+        if u.topic:
+            topics[u.topic] += 1
+            if len(u.examples) < 2:
+                add("unlock-examples", f"证词 {c.id} 的话题「{u.topic}」至少要给两个提问例句")
+    for topic, n in topics.items():
+        if n > 1:
+            add("unique-topics", f"话题「{topic}」被 {n} 条证词使用，问到时不知道该说哪条")
+    for c in case.claims:
+        if not _reachable(case, c.id):
+            add("unlock-reachable", f"证词 {c.id} 的解锁链条有环，永远说不出口")
 
     for step in case.timeline:
         if step.card is not None and step.card not in card_ids:
