@@ -17,14 +17,15 @@ class CommandKind(StrEnum):
 
 @dataclass(frozen=True)
 class Ask:
-    """普通提问或闲聊，交给嫌疑人回答。"""
+    """普通提问或闲聊，交给嫌疑人回答。topic 是问到的隐藏证词（案件里的编号），由意图解析给出（#46）。"""
 
     text: str
+    topic: int | None = None
 
 
 @dataclass(frozen=True)
 class Present:
-    """出示 card 号卡，反驳 claim 号证词。"""
+    """出示 card 号卡，反驳玩家口中的第 claim 条证词（按说出口的顺序，#46）。"""
 
     card: int
     claim: int

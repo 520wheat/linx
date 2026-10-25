@@ -78,6 +78,12 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 .claim .no span { font-size: 34px; font-weight: 700; }
 .claim p { margin: 0; font-size: 24px; line-height: 1.45; font-weight: 500; }
 .claim .sub { font-size: 15px; color: var(--ink-2); font-weight: 400; margin-top: 6px; }
+/* 证词超过三条时收紧行距和字号，四五条也放得下（#46） */
+#claimList.dense { gap: 10px !important; }
+#claimList.dense .claim { padding: 14px 20px; gap: 18px; }
+#claimList.dense .claim .no span { font-size: 26px; }
+#claimList.dense .claim p { font-size: 20px; }
+#claimList.dense .claim .sub { font-size: 14px; margin-top: 4px; }
 .claim.broken { background: var(--muted-card); border-color: transparent; }
 .claim.broken .no span { color: var(--ink-4); }
 .claim.broken p.text { color: var(--ink-3); font-weight: 400; text-decoration: line-through; text-decoration-color: var(--solid); text-decoration-thickness: 2px; }
@@ -123,6 +129,9 @@ header.top { display: flex; align-items: center; justify-content: space-between;
   font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: .12em; color: var(--ink-2); }
 .moment h1 { margin: 0; font-size: 156px; font-weight: 900; line-height: 1; letter-spacing: .04em; color: var(--accent-ink); }
 .scene.active .moment h1 { animation: stamp .45s cubic-bezier(.2, .9, .3, 1.3) both; }
+/* 新说出口的证词（#46）：沿用「戳破瞬间」的强调色闪一下 */
+.claim.fresh { animation: fresh 2.4s ease-out; }
+@keyframes fresh { 0%, 30% { background: var(--tint); box-shadow: inset 0 0 0 2px var(--solid); } 100% { background: var(--card); box-shadow: none; } }
 @keyframes stamp { from { opacity: 0; transform: scale(1.18); } to { opacity: 1; transform: none; } }
 .moment .was { margin: 0; max-width: 1100px; font-size: 30px; line-height: 1.5; color: var(--ink-3);
   text-decoration: line-through; text-decoration-color: var(--solid); text-decoration-thickness: 3px; }
@@ -377,6 +386,7 @@ body.portrait #cluesBtn { display: none; }
   let lastEventId = null;       // 已经展示过的事件，刷新页面不重放
   let momentUntil = 0;          // 「戳破瞬间」显示到什么时候
   let toastTimer = 0;
+  let seenClaims = null;        // 已经显示过的证词序号，用来标出新说出口的证词
 
   const show = (scene) => {
     for (const s of document.querySelectorAll(".scene")) s.classList.toggle("active", s.id === `scene-${scene}`);
@@ -411,8 +421,11 @@ body.portrait #cluesBtn { display: none; }
 
     const broken = snap.claims.filter((c) => c.status === "broken").length;
     $("brokenCount").textContent = `BROKEN ${broken} / ${snap.claims.length}`;
+    // 首次渲染时的证词不算「新」；之后多出来的证词闪一下
+    const isNew = (c) => seenClaims !== null && !seenClaims.has(c.id);
+    $("claimList").classList.toggle("dense", snap.claims.length > 3);
     $("claimList").replaceChildren(...snap.claims.map((c) => {
-      const row = el("article", "card claim" + (c.status === "broken" ? " broken" : ""));
+      const row = el("article", "card claim" + (c.status === "broken" ? " broken" : "") + (isNew(c) ? " fresh" : ""));
       const no = el("span", "no");
       no.append(el("small", null, "证词"), el("span", null, pad(c.id)));
       const body = el("div");
@@ -428,6 +441,7 @@ body.portrait #cluesBtn { display: none; }
       row.append(no, body, status);
       return row;
     }));
+    seenClaims = new Set(snap.claims.map((c) => c.id));
 
     $("cardList").replaceChildren(...snap.cards.map((card) => {
       const n = el("span", "clue" + (card.used ? " used" : ""));
@@ -532,6 +546,8 @@ body.portrait #cluesBtn { display: none; }
         renderMoment(ev);
         momentUntil = Date.now() + 3000;
         setTimeout(() => show(chooseScene()), 3050);
+      } else if (!first && ev.kind === "revealed") {
+        toast([document.createTextNode("新证词 "), el("b", null, pad(ev.claim)), document.createTextNode(`：${ev.claimText}`)]);
       } else if (!first && ev.kind === "wrong") {
         toast([document.createTextNode(`这张卡驳不倒证词${cn(ev.claim)} · 律师还差 `), el("b", null, String(ev.strikesLeft)), document.createTextNode(" 次")]);
       }

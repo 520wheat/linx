@@ -9,6 +9,10 @@ _CONFESS = re.compile(
 _OUT_OF_CHARACTER = re.compile(
     r"AI|人工智能|语言模型|大模型|提示词|系统设定|作为一个|我是一个程序|游戏规则|扮演", re.I
 )
+# 大模型会模仿上下文里的旁白腔（「证词四被戳破了」「他只能让步」），甚至把任务说明念出来（#46 自对弈发现）
+_NARRATOR_VOICE = re.compile(
+    r"被戳破|他只能让步|他改口了|他还在坚持|律师还有|这是证词|证词[一二三四五六七八九十\d]"
+)
 _STRIP = re.compile(r"[（(][^）)]*[）)]|\*+|#+|[\U0001F000-\U0001FFFF☀-➿]")
 SENTENCE_END = "。！？!?"
 # 流式输出时在逗号处也先放出一段，尽早开始 TTS（#22）；守卫按已说出的全部内容、去掉标点后检查
@@ -30,6 +34,8 @@ def violation(sentence: str, *, may_confess: bool) -> str | None:
         return "premature-confession"
     if _OUT_OF_CHARACTER.search(plain):
         return "out-of-character"
+    if _NARRATOR_VOICE.search(plain):
+        return "narrator-voice"
     return None
 
 

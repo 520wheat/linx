@@ -21,10 +21,18 @@ class Answer:
 
 @dataclass(frozen=True)
 class Broke:
-    """戳破了一条证词，嫌疑人升到 stage 档。"""
+    """戳破了一条证词，嫌疑人升到 stage 档。revealed 是随让步改口说出的新证词（#46）。"""
 
     contradiction: Contradiction
     stage: int
+    revealed: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True)
+class Revealed:
+    """侦探问到了隐藏证词的话题，嫌疑人说出这条新证词（#46）。"""
+
+    claim: int
 
 
 @dataclass(frozen=True)
@@ -52,7 +60,7 @@ class Wrong:
 
 @dataclass(frozen=True)
 class UnknownRef:
-    """提到了不存在的卡或证词，不扣机会。"""
+    """提到了不存在的卡，或还没说出口的证词序号，不扣机会。claim 是玩家说的序号。"""
 
     card: int | None
     claim: int | None
@@ -105,6 +113,7 @@ Outcome = (
     Briefing
     | Answer
     | Broke
+    | Revealed
     | Confession
     | AlreadyBroken
     | Wrong

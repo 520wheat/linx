@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 
 from pozhan.case.model import Case, Contradiction
 from pozhan.director.guard import CLAUSE_END, MAX_CHARS, clean, split_sentences, violation
+from pozhan.engine.rules import open_topics
 from pozhan.engine.state import Interrogation
 from pozhan.llm.client import LLM, LLMError, Message
 
@@ -19,9 +20,9 @@ SYSTEM = """你在一个语音审讯游戏里扮演嫌疑人{name}。侦探们�
 真相（只用来保证你说的话不和它冲突，绝不能主动说出来）：
 {truth}
 
-你开场时的证词：
+你已经说出口的证词：
 {claims}
-{concessions}
+{hidden}{concessions}
 说话规则：
 - 只说中文口语，不管对方用什么语言提问。一次说一到三句，总共不超过六十个字。
 - 不要写动作、旁白、括号、表情符号或任何格式符号。
@@ -36,7 +37,17 @@ SYSTEM = """你在一个语音审讯游戏里扮演嫌疑人{name}。侦探们�
 
 def _system(case: Case, state: Interrogation, stage: int) -> str:
     s = case.stages[stage]
-    claims = "\n".join(f"{c.id}. {c.text}" for c in case.claims)
+    claims = "\n".join(f"- {case.claim(i).text}" for i in state.revealed)
+    # 隐藏证词由规则在问到话题时逐字说出（#46）；大模型提前说了，玩家听到了却记不进证词列表。
+    # 要等某条证词被戳破才改口的说法，这时根本不告诉大模型，它就不可能提前说漏
+    unsaid = open_topics(case, state)
+    hidden = (
+        "\n你还没说出口的说法（不要主动提；被问到相关的事就含糊过去，换个话头）：\n"
+        + "\n".join(f"- {c.text}" for c in unsaid)
+        + "\n"
+        if unsaid
+        else ""
+    )
     admitted = [x.concession for x in case.contradictions if x.claim in state.broken]
     concessions = ("\n你已经被迫承认：\n" + "\n".join(f"- {a}" for a in admitted) + "\n") if admitted else ""
     return SYSTEM.format(
@@ -46,6 +57,7 @@ def _system(case: Case, state: Interrogation, stage: int) -> str:
         tone=s.tone,
         truth="\n".join(f"- {t}" for t in case.suspect.truth),
         claims=claims,
+        hidden=hidden,
         concessions=concessions,
     )
 
@@ -82,9 +94,10 @@ def task_wrong(case: Case, card_id: int, claim_id: int) -> str:
 
 
 def task_confess(case: Case, x: Contradiction) -> str:
+    confession = case.suspect.confession or x.concession
     return (
         f"侦探出示了{_card_text(case, x.card)}，戳穿了你最后一条证词{_claim_text(case, x.claim)}。"
-        f"你彻底崩溃，哭着认罪：{x.concession}"
+        f"你彻底崩溃，哭着认罪：{confession}"
     )
 
 

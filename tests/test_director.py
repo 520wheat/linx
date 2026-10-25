@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from pozhan.director import Director
 from pozhan.director.guard import clean, split_sentences, violation
 from pozhan.director.narrator import cn, duration
@@ -92,7 +94,7 @@ async def test_broke_prompts_the_concession_then_narrates(case):
     llm = ScriptLLM("我……我是上去过，", "可那是拿奖品！")
     d = Director(llm=llm, model="m")
     x = case.contradiction(2, 1)
-    state = new_game(case, 0).__class__(case_id=case.id, started_at=0, stage=1, broken=(1,))
+    state = replace(new_game(case, 0), stage=1, broken=(1,))
     out = await lines(d, case, state, Broke(x, 1))
     assert out[0].speaker == "narrator" and out[0].text == "证词一被戳破了！"  # 判定先说，零延迟
     assert "".join(line.text for line in out[1:-1]) == "我……我是上去过，可那是拿奖品！"
@@ -169,3 +171,9 @@ def test_suspect_history_window():
 async def test_read_claims_has_no_doubled_punctuation(case):
     out = await lines(Director(llm=None, model=""), case, new_game(case, 0), ReadClaims())
     assert "。。" not in out[0].text and out[0].text.count("证词") == 3
+
+
+def test_narrator_voice_from_the_model_is_blocked():
+    assert violation("证词四被戳破了！", may_confess=False) == "narrator-voice"
+    assert violation("他只能让步：承认下午没碰过表盒", may_confess=False) == "narrator-voice"
+    assert violation("你们这证据说明不了什么。", may_confess=False) is None

@@ -11,7 +11,7 @@ from pozhan.case.model import Case
 from pozhan.director import narrator
 from pozhan.director.director import NEUTRAL, Director, Line
 from pozhan.engine.events import Ask, Command, CommandKind, Event
-from pozhan.engine.outcomes import Briefing, Broke, Confession, Lawyer, Outcome, Quit, Repeat, Wrong
+from pozhan.engine.outcomes import Briefing, Broke, Confession, Lawyer, Outcome, Quit, Repeat, Revealed, Wrong
 from pozhan.engine.rules import apply, new_game
 from pozhan.engine.state import Interrogation
 from pozhan.gamelog import GameLog
@@ -90,7 +90,7 @@ class Game:
                 claim, card = self.case.claim(x.claim), self.case.card(x.card)
                 event = {
                     "kind": "confession" if isinstance(outcome, Confession) else "broke",
-                    "claim": x.claim,
+                    "claim": state.label(x.claim),  # 玩家口中的序号（#46）
                     "claimText": claim.text if claim else "",
                     "card": x.card,
                     "cardTitle": card.title if card else "",
@@ -98,8 +98,14 @@ class Game:
                     "fromStage": self.case.stages[prev_stage].name,
                     "toStage": self.case.stages[state.stage].name,
                 }
+            case Revealed(claim=claim_id):
+                event = {
+                    "kind": "revealed",
+                    "claim": state.label(claim_id),
+                    "claimText": self.case.claim(claim_id).text,
+                }
             case Wrong(card=card, claim=claim, strikes_left=left):
-                event = {"kind": "wrong", "card": card, "claim": claim, "strikesLeft": left}
+                event = {"kind": "wrong", "card": card, "claim": state.label(claim), "strikesLeft": left}
             case Lawyer(reason=reason):
                 event = {"kind": "lawyer", "reason": reason}
             case Quit():
@@ -152,7 +158,7 @@ class Game:
                 guess_state, guess = apply(self.case, session.state, Ask(text), now)
                 spec = _Speculation(self.director, self.case, guess_state, guess, session)
                 pending.append(spec)
-            event = await self.interpreter.classify(text, self.case)
+            event = await self.interpreter.classify(text, self.case, session.state)
             if spec is not None and event != Ask(text):
                 await spec.cancel()
                 spec = None
@@ -184,10 +190,13 @@ class Game:
         emoji = self.director.emoji(self.case, session.state, outcome)
         yield emoji
         parts: list[str] = []
+        suspect_parts: list[str] = []
         t_first = None
         async for line in lines:
             t_first = t_first or time.monotonic() - t0
             parts.append(line.text)
+            if line.speaker == "suspect":
+                suspect_parts.append(line.text)
             same_turn = session.line is not None and session.line.get("turn") == t0
             if same_turn and session.line["speaker"] == line.speaker:
                 session.line = {**session.line, "text": session.line["text"] + line.text}
@@ -200,7 +209,8 @@ class Game:
 
         spoken = "".join(parts)
         session.last_reply = emoji + spoken
-        session.remember(text, spoken)
+        # 对话历史只记嫌疑人自己说的话：混进旁白，大模型会学着说「证词四被戳破了」（#46）
+        session.remember(text, "".join(suspect_parts) or "……")
         self.store.put(session)
         self.log.write(
             key,

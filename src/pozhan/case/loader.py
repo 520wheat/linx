@@ -4,12 +4,25 @@ from typing import Any
 
 import yaml
 
-from pozhan.case.model import Card, Case, Claim, Contradiction, Limits, Stage, Suspect, TimelineStep
+from pozhan.case.model import Card, Case, Claim, Contradiction, Limits, Stage, Suspect, TimelineStep, Unlock
 
 
 def _tidy(text: str) -> str:
     """YAML 折行会在中文句子之间留下空格（「……不见了。 监控显示……」），去掉它们。"""
     return re.sub(r"(?<=[\u3000-\u303f\uff00-\uffef\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", text.strip())
+
+
+def _unlock(data: Any) -> Unlock | None:
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise CaseFormatError("claim 的 unlock 应该是对象")
+    after = data.get("after")
+    return Unlock(
+        topic=str(data.get("topic") or ""),
+        examples=tuple(str(x) for x in data.get("examples") or ()),
+        after=int(after) if after is not None else None,
+    )
 
 
 class CaseFormatError(ValueError):
@@ -44,12 +57,14 @@ def parse_case(data: dict[str, Any]) -> Case:
                 name=_require(suspect, "name", "suspect"),
                 persona=_tidy(_require(suspect, "persona", "suspect")),
                 truth=tuple(suspect.get("truth") or ()),
+                confession=_tidy(suspect.get("confession") or ""),
             ),
             claims=tuple(
                 Claim(
                     id=int(_require(c, "id", "claim")),
                     text=_require(c, "text", "claim"),
                     lie=bool(c.get("lie")),
+                    unlock=_unlock(c.get("unlock")),
                 )
                 for c in _list(data, "claims")
             ),

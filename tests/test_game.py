@@ -96,3 +96,15 @@ async def test_interrupted_turn_cancels_speculation_and_frees_the_session(case):
     assert llm.cancelled == 1  # 后台的投机生成被取消，没有残留任务
     reply, _ = await say(game, "念一下证词")  # 下一轮照常处理
     assert reply.startswith("😶证词一")
+
+
+async def test_history_keeps_only_the_suspects_own_words(case):
+    # 旁白混进历史，大模型会学着说「证词一被戳破了」（#46）
+    game = make_game(case, SlowLLM('{"present": false}'))
+    await say(game, "开始")
+    await say(game, "用2号卡反驳证词1")
+    await say(game, "念一下证词")
+    assistant = [m["content"] for m in game.store.get("k").history if m["role"] == "assistant"]
+    assert assistant[1] == "我一直在包厢。"
+    assert assistant[2] == "……"
+    assert not any("被戳破" in a for a in assistant[1:])

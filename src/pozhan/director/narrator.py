@@ -43,17 +43,31 @@ def briefing(case: Case) -> str:
 
 
 def opening_statement(case: Case) -> str:
-    """嫌疑人的开场陈述，逐字使用案件里的证词，保证玩家听到的证词和规则一致。"""
-    parts = [f"第{cn(c.id)}，{c.text}" for c in case.claims]
+    """嫌疑人的开场陈述，逐字使用案件里的证词，保证玩家听到的证词和规则一致。
+
+    隐藏证词不在开场说（#46）；证词按说出口的顺序编号。
+    """
+    parts = [f"第{cn(i)}，{c.text}" for i, c in enumerate(case.opening_claims, 1)]
     return "警官，我配合调查。" + "".join(parts)
 
 
 def read_claims(case: Case, state: Interrogation) -> str:
     lines = []
-    for c in case.claims:
-        mark = "（已被戳破）" if c.id in state.broken else ""
-        lines.append(f"证词{cn(c.id)}{mark}：{c.text.rstrip('。！？.!?')}")
+    for i, claim_id in enumerate(state.revealed, 1):
+        c = case.claim(claim_id)
+        mark = "（已被戳破）" if claim_id in state.broken else ""
+        lines.append(f"证词{cn(i)}{mark}：{c.text.rstrip('。！？.!?')}")
     return "。".join(lines) + "。"
+
+
+def new_claim(label: int) -> str:
+    """嫌疑人说出一条新证词之后，旁白把它记下来（#46）。"""
+    return f"记下了，这是证词{cn(label)}。"
+
+
+def amended(case: Case, claim_id: int, label: int) -> str:
+    """戳破之后嫌疑人改口，旁白逐字复述新说法，保证玩家记下的证词和规则一致。"""
+    return f"他改口了：{case.claim(claim_id).text}这是证词{cn(label)}。"
 
 
 def read_card(case: Case, card_id: int) -> str:
@@ -69,8 +83,12 @@ def broke(claim_id: int) -> str:
 
 
 def still_holding(case: Case, state: Interrogation) -> str:
-    left = [c for c in case.claims if c.lie and c.id not in state.broken]
-    return f"他还在坚持{'、'.join(f'证词{cn(c.id)}' for c in left)}。" if left else ""
+    # 不按真假筛选：列出来的只是「说出口、还没被戳破」的证词，不能借此泄露哪条是真话
+    left = [i for i, claim_id in enumerate(state.revealed, 1) if claim_id not in state.broken]
+    if left:
+        return f"他还在坚持{'、'.join(f'证词{cn(i)}' for i in left)}。"
+    # 说出口的都戳破了却还没认罪：还有话没问出来（#46）。不说还剩几条，只提示该做什么
+    return "他说过的证词都被戳破了，可还没松口。看看手里还没用上的卡，围绕它追问。"
 
 
 def wrong(claim_id: int) -> str:
@@ -85,10 +103,10 @@ def already_broken(claim_id: int) -> str:
     return f"证词{cn(claim_id)}已经被戳破了，看看别的证词吧。"
 
 
-def unknown_ref(case: Case, card: int | None, claim: int | None) -> str:
+def unknown_ref(case: Case, state: Interrogation, card: int | None, claim: int | None) -> str:
     if card is not None:
         return f"你们手里没有{cn(card)}号卡，线索卡是一到{cn(len(case.cards))}号。"
-    return f"没有第{cn(claim)}条证词，证词是一到{cn(len(case.claims))}条。"
+    return f"没有第{cn(claim)}条证词，他到现在只说过{cn(len(state.revealed))}条。"
 
 
 def clarify(card: int | None, claim: int | None) -> str:

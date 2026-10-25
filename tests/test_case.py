@@ -55,7 +55,9 @@ def test_needs_a_distractor(case_data):
 
 
 def test_stage_count(case_data):
-    case_data["stages"] = case_data["stages"][:2]
+    case_data["stages"] = case_data["stages"][:1]
+    assert "stage-count" in rules(case_data)
+    case_data["stages"] = case_data["stages"] * 5
     assert "stage-count" in rules(case_data)
 
 

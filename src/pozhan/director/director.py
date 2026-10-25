@@ -17,6 +17,7 @@ from pozhan.engine.outcomes import (
     ReadCard,
     ReadClaims,
     Remaining,
+    Revealed,
     Rules,
     UnknownRef,
     Wrong,
@@ -28,7 +29,7 @@ from pozhan.llm.client import LLM, Message
 NEUTRAL = "😶"  # 只有旁白说话的回合用中性情绪
 
 # 这些结果里嫌疑人会开口，本轮情绪取嫌疑人当前档位
-_SUSPECT_SPEAKS = (Briefing, Answer, Broke, Confession, Wrong)
+_SUSPECT_SPEAKS = (Briefing, Answer, Broke, Confession, Wrong, Revealed)
 
 
 @dataclass(frozen=True)
@@ -81,27 +82,33 @@ class Director:
             case Answer(question=q, slip=slip):
                 async for line in self._suspect(case, state, task_answer(q, slip), history):
                     yield line
-            case Broke(contradiction=x):
-                yield say(narrator.broke(x.claim))
+            case Revealed(claim=claim_id):
+                # 新证词逐字说出，不经大模型：屏幕上记下的和玩家听到的必须一致（#46）
+                yield Line("suspect", case.claim(claim_id).text)
+                yield say(narrator.new_claim(state.label(claim_id)))
+            case Broke(contradiction=x, revealed=amended):
+                yield say(narrator.broke(state.label(x.claim)))
                 async for line in self._suspect(case, state, task_broke(case, x), history):
                     yield line
+                for claim_id in amended:
+                    yield say(narrator.amended(case, claim_id, state.label(claim_id)))
                 yield say(narrator.still_holding(case, state))
             case Confession(contradiction=x):
-                yield say(narrator.broke(x.claim))
+                yield say(narrator.broke(state.label(x.claim)))
                 async for line in self._suspect(
                     case, state, task_confess(case, x), history, may_confess=True
                 ):
                     yield line
                 yield say(narrator.confession_wrap(case))
             case Wrong(card=card, claim=claim, strikes_left=left):
-                yield say(narrator.wrong(claim))
+                yield say(narrator.wrong(state.label(claim)))
                 async for line in self._suspect(case, state, task_wrong(case, card, claim), history):
                     yield line
                 yield say(narrator.countdown(left))
             case AlreadyBroken(claim=claim):
-                yield say(narrator.already_broken(claim))
+                yield say(narrator.already_broken(state.label(claim)))
             case UnknownRef(card=card, claim=claim):
-                yield say(narrator.unknown_ref(case, card, claim))
+                yield say(narrator.unknown_ref(case, state, card, claim))
             case Clarify(card=card, claim=claim):
                 yield say(narrator.clarify(card, claim))
             case Lawyer(reason=reason):
