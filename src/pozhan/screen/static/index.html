@@ -589,9 +589,9 @@ body.play #sayline { display: block; }
           const pick = el("div", "pick");
           pick.append(el("span", null, "反驳哪条证词？"));
           for (const c of holding) {
-            const b = el("button", "chip", `证词${cn(c.id)}`);
+            const short = c.text.length > 14 ? c.text.slice(0, 14) + "…" : c.text;
+            const b = el("button", "chip", `证词${cn(c.id)}：${short}`);
             b.type = "button";
-            b.title = c.text;
             b.addEventListener("click", () => {
               presenting = null;
               $("clues").hidden = true;
@@ -617,6 +617,7 @@ body.play #sayline { display: block; }
     if (snap.claims) renderInterrogation();
     if (snap.result) renderEnded();
     renderSay();
+    if (onSnap) onSnap();
 
     // 只播放页面打开之后发生的事件：刷新或重连时不重放旧的「戳破瞬间」
     const ev = snap.event;
@@ -673,6 +674,7 @@ body.play #sayline { display: block; }
   let sfxCtx = null;
   let sendText = null;          // 网页开玩时把一句话交给灵矽（#59）；陪玩屏只看不玩，为 null
   let presenting = null;        // 正在为哪张卡选证词（线索卡面板里的「出示」）
+  let onSnap = null;            // 网页开玩：每次收到新快照后刷新按钮文字
   if (params.get("sfx") === "1") {
     addEventListener("pointerdown", () => { sfxCtx = sfxCtx || new AudioContext(); }, { once: true });
   }
@@ -963,6 +965,9 @@ body.play #sayline { display: block; }
     const typing = (e) => e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
     addEventListener("keydown", (e) => { if (e.code === "Space" && !e.repeat && !typing(e)) down(e); });
     addEventListener("keyup", (e) => { if (e.code === "Space" && !typing(e)) up(e); });
+    // 还没点过按钮时，按场景决定按钮文字：开局前是「开始游戏」，对局中是「点一下说话」
+    onSnap = () => { if (!connected && talk.dataset.state === "idle") setState("idle", chooseScene() === "briefing" ? "开始游戏" : IDLE); };
+    if (snap) onSnap();
     renderSay();
     if (snap) renderClues();
   }
