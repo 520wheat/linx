@@ -3,7 +3,7 @@
 覆盖 Proposal #3 的验收标准 8（嫌疑人不编造设定之外的新不在场证明、人物、地点）和 11（破案率）。
 侦探只拿到玩家能拿到的信息：案情、证词、线索卡，以及每轮的回复。
 需要环境变量 LLM_BASE_URL、LLM_API_KEY。
-用法：uv run python evals/selfplay.py [局数，默认 5]
+用法：uv run python evals/selfplay.py [局数，默认 5]；POZHAN_CASE=cases/xxx.yaml 指定案子
 """
 
 import asyncio
@@ -118,8 +118,10 @@ async def judge(llm, case, transcript) -> list[dict]:
 
 async def main(games: int) -> None:
     settings = Settings.from_env()
-    app = build_app(Settings(**{**settings.__dict__, "log_dir": "", "api_key": ""}))
-    case = load_case(settings.case_path)
+    # 自对弈一次只打一个案子：POZHAN_CASE 指定，默认第一个案子
+    case_path = settings.case_path or str(ROOT / "cases" / "golden-watch.yaml")
+    app = build_app(Settings(**{**settings.__dict__, "case_path": case_path, "log_dir": "", "api_key": ""}))
+    case = load_case(case_path)
     llm = OpenAICompatLLM(
         settings.llm_base_url, settings.llm_api_key, temperature=0.7, extra_body=settings.llm_extra_body
     )

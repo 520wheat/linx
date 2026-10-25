@@ -52,7 +52,7 @@ def test_unsaid_claim_numbers_are_unknown_not_strikes(v2):
     state = new_game(v2, 0)
     state, out = apply(v2, state, Present(card=6, claim=3), 1)
     assert out == UnknownRef(card=None, claim=3) and state.strikes == 0
-    assert narrator.unknown_ref(v2, state, None, 3) == "没有第三条证词，他到现在只说过二条。"
+    assert narrator.unknown_ref(v2, state, None, 3) == "没有第三条证词，他到现在只说过两条。"
 
 
 def test_breaking_a_claim_can_amend_it_into_a_new_lie(v2):
@@ -79,8 +79,10 @@ def test_topic_that_is_not_open_is_an_ordinary_question(v2):
     assert isinstance(out, Answer)
 
 
-def test_presenting_without_asking_can_never_win(v2):
-    """穷举所有「只出示、不提问」的走法：律师到场之前不可能让嫌疑人认罪。"""
+@pytest.mark.parametrize("path", CASES, ids=lambda p: p.stem)
+def test_presenting_without_asking_can_never_win(path):
+    """每个正式案件都穷举所有「只出示、不提问」的走法：律师到场之前不可能让嫌疑人认罪。"""
+    v2 = load_case(path)
     start = new_game(v2, 0)
     queue, seen = deque([start]), {start}
     while queue:
@@ -225,3 +227,25 @@ def test_classifier_only_offers_unbroken_claims(v2):
     system = build_messages(v2, "t", state)[0]["content"]
     assert v2.claim(1).text not in system
     assert f"2. {v2.claim(2).text}" in system and f"3. {v2.claim(3).text}" in system
+
+
+async def test_stuck_players_get_the_hidden_claim_blurted_out(v2):
+    from pozhan.engine.rules import STUCK_ASKS
+
+    state = new_game(v2, 0)
+    for move in [Present(2, 1), Present(6, 3), Present(4, 2), Present(5, 4)]:
+        state, _ = apply(v2, state, move, 1)
+    for _ in range(STUCK_ASKS - 1):
+        state, out = apply(v2, state, Ask("你还有什么要说的"), 2)
+        assert isinstance(out, Answer)
+    state, out = apply(v2, state, Ask("老实交代"), 3)
+    assert out == Revealed(4, blurted=True) and state.label(4) == 5
+    lines = [x async for x in Director(llm=None, model="").speak(v2, state, out, [])]
+    assert lines[0].text == v2.claim(4).text and lines[1].text == "他自己说漏了一句。记下了，这是证词五。"
+
+
+def test_no_blurting_while_spoken_claims_still_stand(v2):
+    state = new_game(v2, 0)
+    for _ in range(6):
+        state, out = apply(v2, state, Ask("随便问问"), 1)
+        assert not isinstance(out, Revealed)

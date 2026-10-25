@@ -69,6 +69,7 @@ class Suspect:
     truth: tuple[str, ...] = ()  # 真相，只在服务端使用，用来约束嫌疑人不编造
     # 认罪时要说出的内容。最后被戳破的可能是任何一条证词（#46），所以认罪内容不能只写在某条矛盾的让步里
     confession: str = ""
+    stolen: tuple[str, ...] = ()  # 被盗物的叫法，守卫用来识别提前认罪（「表是我拿的」）
 
 
 @dataclass(frozen=True)

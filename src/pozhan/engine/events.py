@@ -13,6 +13,8 @@ class CommandKind(StrEnum):
     RULES = "rules"  # 规则是什么
     REPEAT = "repeat"  # 再说一遍
     QUIT = "quit"  # 结束游戏
+    NEXT_CASE = "next_case"  # 下一个案子（#53）
+    LIST_CASES = "list_cases"  # 有哪些案子（#53）
 
 
 @dataclass(frozen=True)

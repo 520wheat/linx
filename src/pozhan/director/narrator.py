@@ -7,7 +7,7 @@ from pozhan.case.model import Case
 from pozhan.engine.state import Interrogation
 
 CN = "零一二三四五六七八九十"
-AGAIN = "说「重新开始」可以再来一局。"
+AGAIN = "说「重新开始」再来一局，说「下一个案子」换一个新案子。"
 
 
 def cn(n: int) -> str:
@@ -21,19 +21,24 @@ def cn(n: int) -> str:
     return str(n)
 
 
+def count(n: int) -> str:
+    """数量词前的数字：「两条」「两次」，不是「二条」「二次」。编号（证词二、二号卡）仍用 cn。"""
+    return "两" if n == 2 else cn(n)
+
+
 def duration(seconds: int) -> str:
     minutes, sec = divmod(max(0, seconds), 60)
     if minutes and sec:
-        return f"{cn(minutes)}分{cn(sec)}秒"
-    return f"{cn(minutes)}分钟" if minutes else f"{cn(sec)}秒"
+        return f"{count(minutes)}分{cn(sec)}秒"
+    return f"{count(minutes)}分钟" if minutes else f"{count(sec)}秒"
 
 
 def rules(case: Case) -> str:
     n = len(case.cards)
     return (
         f"规则很简单：你们可以随便提问，发现证词的破绽，就说用几号卡反驳第几条证词。"
-        f"你们手里有{cn(n)}张线索卡，其中有的卡帮不上忙。"
-        f"出示错{cn(case.limits.strikes)}次，或者审讯超过{cn(case.limits.minutes)}分钟，律师就会到场。"
+        f"你们手里有{count(n)}张线索卡，其中有的卡帮不上忙。"
+        f"出示错{count(case.limits.strikes)}次，或者审讯超过{count(case.limits.minutes)}分钟，律师就会到场。"
         f"想听证词就说「念一下证词」，想听卡就说「念一下几号卡」。"
     )
 
@@ -45,7 +50,9 @@ def quick_rules() -> str:
 
 def lawyer_rule(case: Case) -> str:
     """第一次出示错误时补上律师规则：这时玩家最需要知道代价。"""
-    return f"出示错{cn(case.limits.strikes)}次，或者审讯超过{cn(case.limits.minutes)}分钟，律师就会到场。"
+    return (
+        f"出示错{count(case.limits.strikes)}次，或者审讯超过{count(case.limits.minutes)}分钟，律师就会到场。"
+    )
 
 
 def briefing(case: Case) -> str:
@@ -101,6 +108,11 @@ def still_holding(case: Case, state: Interrogation) -> str:
     return "他说过的证词都被戳破了，可还没松口。看看手里还没用上的卡，围绕它追问。"
 
 
+def blurted(label: int) -> str:
+    """玩家卡住时嫌疑人自己说漏了隐藏证词（#53）。"""
+    return f"他自己说漏了一句。记下了，这是证词{cn(label)}。"
+
+
 def wrong(claim_id: int) -> str:
     return f"这张卡驳不倒证词{cn(claim_id)}。"
 
@@ -110,7 +122,7 @@ def weak(claim_label: int) -> str:
 
 
 def countdown(strikes_left: int) -> str:
-    return f"律师还有{cn(strikes_left)}次就到。"
+    return f"律师还有{count(strikes_left)}次就到。"
 
 
 def already_broken(claim_id: int) -> str:
@@ -120,7 +132,7 @@ def already_broken(claim_id: int) -> str:
 def unknown_ref(case: Case, state: Interrogation, card: int | None, claim: int | None) -> str:
     if card is not None:
         return f"你们手里没有{cn(card)}号卡，线索卡是一到{cn(len(case.cards))}号。"
-    return f"没有第{cn(claim)}条证词，他到现在只说过{cn(len(state.revealed))}条。"
+    return f"没有第{cn(claim)}条证词，他到现在只说过{count(len(state.revealed))}条。"
 
 
 def clarify(card: int | None, claim: int | None) -> str:
@@ -132,7 +144,7 @@ def clarify(card: int | None, claim: int | None) -> str:
 
 
 def remaining(strikes_left: int, seconds_left: int) -> str:
-    return f"还能出示错{cn(strikes_left)}次，审讯时间还剩{duration(seconds_left)}。"
+    return f"还能出示错{count(strikes_left)}次，审讯时间还剩{duration(seconds_left)}。"
 
 
 def confession_wrap(case: Case) -> str:
@@ -146,6 +158,13 @@ def lawyer(case: Case, reason: str) -> str:
 
 def quit_game(case: Case) -> str:
     return f"游戏结束。真相是：{case.reveal}{AGAIN}"
+
+
+def case_list(titles: tuple[str, ...], current: int) -> str:
+    items = "；".join(f"{cn(i)}，{t}" for i, t in enumerate(titles, 1))
+    return (
+        f"现在有{count(len(titles))}个案子：{items}。正在审的是第{cn(current + 1)}个。说「下一个案子」就换。"
+    )
 
 
 def not_heard() -> str:

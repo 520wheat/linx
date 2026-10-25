@@ -100,3 +100,19 @@ def test_timeline_card_must_exist(case_data):
 def test_timeline_is_optional(case_data):
     del case_data["timeline"]
     assert parse_case(case_data).timeline == ()
+
+
+def test_library_follows_the_index_and_skips_drafts(tmp_path, case_data):
+    import yaml as _yaml
+
+    from pozhan.case import CaseFormatError, load_library
+
+    for cid in ("b-case", "a-case", "c-case"):
+        (tmp_path / f"{cid}.yaml").write_text(_yaml.safe_dump({**case_data, "id": cid}), encoding="utf-8")
+    (tmp_path / "drafts").mkdir()
+    (tmp_path / "drafts" / "d.yaml").write_text(_yaml.safe_dump({**case_data, "id": "d"}), encoding="utf-8")
+    (tmp_path / "index.txt").write_text("# 顺序\nc-case\n", encoding="utf-8")
+    assert [c.id for c in load_library(tmp_path)] == ["c-case", "a-case", "b-case"]
+    (tmp_path / "index.txt").write_text("nope\n", encoding="utf-8")
+    with pytest.raises(CaseFormatError, match="nope"):
+        load_library(tmp_path)

@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from pozhan.game import Game
 from pozhan.llm.client import Message
@@ -107,6 +107,12 @@ def create_app(
         # hub 里存的是发布时刻的快照；前端用 serverNow 校准倒计时，所以这里换成当前时间
         return {**snap, "serverNow": time.time()}
 
+    @app.get("/")
+    async def root(request: Request):
+        # 直接打开域名时进入网页开玩；带上原来的查询参数（token 等）
+        query = request.url.query
+        return RedirectResponse("/screen?" + (query if "play=" in query else "play=1&" + query).rstrip("&"))
+
     @app.get("/screen")
     async def screen_page():
         # 页面本身不含对局数据，数据接口才校验令牌；页面从自己的 URL 里取 token 去请求数据
@@ -173,7 +179,7 @@ def create_app(
 
     @app.get("/healthz")
     async def healthz() -> dict:
-        return {"ok": True, "case": game.case.id}
+        return {"ok": True, "case": game.case.id, "cases": [c.id for c in game.cases]}
 
     @app.get("/v1/models")
     async def models(request: Request):

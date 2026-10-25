@@ -17,6 +17,7 @@ from pozhan.engine.outcomes import (
     Answer,
     Briefing,
     Broke,
+    CaseList,
     Confession,
     GameOver,
     Lawyer,
@@ -104,10 +105,11 @@ class Director:
             case Answer(question=q, slip=slip):
                 async for line in self._suspect(case, state, task_answer(q, slip), history):
                     yield line
-            case Revealed(claim=claim_id):
+            case Revealed(claim=claim_id, blurted=blurted):
                 # 新证词逐字说出，不经大模型：屏幕上记下的和玩家听到的必须一致（#46）
                 yield Line("suspect", case.claim(claim_id).text)
-                yield say(narrator.new_claim(state.label(claim_id)))
+                label = state.label(claim_id)
+                yield say(narrator.blurted(label) if blurted else narrator.new_claim(label))
             case Broke(contradiction=x, revealed=amended):
                 yield say(narrator.broke(state.label(x.claim)))
                 async for line in self._suspect(case, state, task_broke(case, x), history):
@@ -151,5 +153,7 @@ class Director:
                 yield say(narrator.rules(case))
             case Quit():
                 yield say(narrator.quit_game(case))
+            case CaseList(titles=titles, current=current):
+                yield say(narrator.case_list(titles, current))
             case GameOver():
                 yield say(narrator.game_over())

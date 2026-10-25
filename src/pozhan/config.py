@@ -7,7 +7,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class Settings:
-    case_path: str = "cases/golden-watch.yaml"
+    cases_dir: str = "cases"  # 案件库目录（#53）
+    case_path: str = ""  # 只玩这一个案子（调试或评测用）；设置了就不加载案件库
     api_key: str = ""  # 灵矽「我的模型」里填的 API 密钥；为空则不校验（仅限本地开发）
     screen_token: str = ""  # 陪玩屏的只读令牌；为空则不校验（仅限本地开发）
     linx_device: str = ""  # 网页开玩用的灵矽设备身份文件（#43）；为空则不开放网页开玩
@@ -25,7 +26,8 @@ class Settings:
     def from_env(cls) -> "Settings":
         env = os.environ
         return cls(
-            case_path=env.get("POZHAN_CASE", cls.case_path),
+            cases_dir=env.get("POZHAN_CASES", cls.cases_dir),
+            case_path=env.get("POZHAN_CASE", ""),
             api_key=env.get("POZHAN_API_KEY", ""),
             screen_token=env.get("POZHAN_SCREEN_TOKEN", ""),
             linx_device=env.get("POZHAN_LINX_DEVICE", ""),

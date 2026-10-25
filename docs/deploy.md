@@ -25,7 +25,17 @@ curl http://127.0.0.1:8000/healthz
 返回 `{"ok":true,"case":"golden-watch"}` 就说明服务起来了。
 
 - **对局日志**：在卷 `/data/logs/games/<日期>/` 下，每局一个 JSONL 文件。
-- **换案件**：挂载案件文件，并设置 `POZHAN_CASE` 指向它。
+- **服务器网卡 MTU 小于 1500 时（很多云主机是 1450、1480），给容器单独建一个同 MTU 的网络**，否则从容器出去的 TLS 握手会偶发卡死：大模型调用报 `ConnectTimeout`，网页开玩报「连接灵矽失败」。先用 `ip -o link` 看出口网卡的 MTU，再按它建网络。同时把 DNS 换成稳定的公共解析，并让 A/AAAA 查询依次发出，避免偶发的 5 秒解析延迟：
+
+  ```bash
+  docker network create --opt com.docker.network.driver.mtu=1480 pozhan-net
+  docker run -d --name pozhan --restart unless-stopped --network pozhan-net -p 127.0.0.1:18787:8000 \
+    --dns 223.5.5.5 --dns 119.29.29.29 --dns-opt single-request-reopen --dns-opt timeout:1 --dns-opt attempts:3 \
+    --env-file /opt/pozhan/env -v /opt/pozhan/data:/data pozhan
+  ```
+
+  以上两个坑都是在 las 上实测踩到的（出口网卡 MTU 1480，Docker 网桥默认 1500）。
+- **换案件**：镜像里自带 `cases/` 案件库（顺序见 `cases/index.txt`）。要用自己的案件库，就挂载一个目录，并设置 `POZHAN_CASES` 指向它；只想玩某一个案件时，设置 `POZHAN_CASE` 指向那个文件。
 
 ### 直接运行
 
@@ -41,7 +51,10 @@ HOST=0.0.0.0 PORT=8000 POZHAN_API_KEY=... LLM_BASE_URL=... LLM_API_KEY=... uv ru
 
 灵矽平台在公网上，必须能通过 HTTPS 访问到服务。
 
-- **正式上线**：放在有固定域名和证书的反向代理后面（Nginx、云厂商负载均衡等）。
+- **正式上线**：放在有固定域名和证书的反向代理后面（Nginx、云厂商负载均衡等）。Nginx 要注意两点：
+  - `/screen/voice` 是 WebSocket，要转发 `Upgrade` / `Connection` 头；
+  - 其余路径要关闭缓冲（`proxy_buffering off`），陪玩屏的 SSE 和「我的模型」的流式回复才能实时到达。
+- **两套智能体**：建议在智控台建两个智能体，各配一个「我的模型」。本地测试用的指向临时隧道，线上用的指向正式域名，网页开玩各用一台虚拟设备（`DEVSIM_STATE` 指定不同的身份文件），互不干扰。
 - **临时演示**：用 cloudflared 的临时隧道。如果本机有代理导致 QUIC 连不上，加 `--protocol http2`。
 
 ```bash
@@ -88,7 +101,7 @@ cloudflared tunnel --protocol http2 --url http://127.0.0.1:8000
 
 ## 4. 验收
 
-- **真机**：对设备说「开始审讯」，应该听到案情、三条证词和规则。
+- **真机**：对设备说「开始审讯」，应该听到案情、嫌疑人的开场证词和一句话玩法（约三十秒）。
 - **没有硬件**：用设备模拟器，在 macOS 上用合成语音跑一局：
 
 ```bash

@@ -7,7 +7,7 @@ from pathlib import Path
 import uvicorn
 
 from pozhan.cards import render as render_cards
-from pozhan.case import load_case, validate
+from pozhan.case import load_case, load_library, validate
 from pozhan.config import Settings
 from pozhan.director.director import Director
 from pozhan.game import Game
@@ -24,10 +24,14 @@ log = logging.getLogger("pozhan")
 
 def build_app(settings: Settings | None = None):
     settings = settings or Settings.from_env()
-    case = load_case(settings.case_path)
-    problems = validate(case)
-    if problems:
-        raise SystemExit("案件校验未通过：" + "；".join(p.message for p in problems))
+    cases = (load_case(settings.case_path),) if settings.case_path else load_library(settings.cases_dir)
+    if not cases:
+        raise SystemExit(f"案件库 {settings.cases_dir} 里没有案件")
+    for c in cases:
+        problems = validate(c)
+        if problems:
+            raise SystemExit(f"案件 {c.id} 校验未通过：" + "；".join(p.message for p in problems))
+    case = cases[0]
 
     intent_llm = suspect_llm = None
     if settings.llm_enabled:
@@ -48,6 +52,7 @@ def build_app(settings: Settings | None = None):
         log.warning("未配置 POZHAN_SCREEN_TOKEN：陪玩屏数据不校验令牌，只适合本地开发")
     game = Game(
         case=case,
+        cases=cases,
         interpreter=Interpreter(
             RuleMatcher(),
             LLMClassifier(intent_llm, settings.intent_model) if intent_llm else None,

@@ -174,6 +174,10 @@ header.top { display: flex; align-items: center; justify-content: space-between;
   opacity: 0; transition: opacity .3s; }
 #conn.show { opacity: 1; }
 #conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--solid); }
+.denied { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 24px; background: var(--bg); text-align: center; z-index: 10; }
+.denied b { font-size: 22px; }
+.denied p { margin: 0; max-width: 420px; font-size: 16px; line-height: 1.7; color: var(--ink-3); }
 
 /* 网页开玩（?play=1，#43）：按住说话。放在画面之外，不随 1600×900 缩放，手机上也按得到 */
 /* 开玩时画面让出底部一条给按钮，避免挡住字幕 */
@@ -561,7 +565,15 @@ body.portrait #cluesBtn { display: none; }
     tick();
   }
 
-  function connect() {
+  // 令牌缺失或错误时，说清楚该怎么办，而不是一直显示「正在重新连接」
+  function denied() {
+    const box = el("div", "denied");
+    box.append(el("b", null, "这个链接打不开对局"), el("p", null, "链接里缺少访问令牌，或者令牌不对。请向组织者要一个带 token 的完整链接。"));
+    document.body.append(box);
+    document.body.classList.remove("play");
+  }
+
+  async function connect() {
     const q = new URLSearchParams();
     for (const k of ["token", "device"]) if (params.get(k)) q.set(k, params.get(k));
     // 相对页面路径计算接口地址：挂在反向代理的子路径下也能用
@@ -570,6 +582,11 @@ body.portrait #cluesBtn { display: none; }
     const ok = () => { clearTimeout(lostTimer); lostTimer = 0; $("conn").classList.remove("show"); };
     // 断开超过 2 秒才提示，避免网络抖动时闪烁
     const lost = () => { if (!lostTimer) lostTimer = setTimeout(() => $("conn").classList.add("show"), 2000); };
+
+    try {
+      const r = await fetch(`${base}state?${q}`, { cache: "no-store" });
+      if (r.status === 401) { denied(); return; }
+    } catch {}
 
     let gotAny = false;
     const es = new EventSource(`${base}events?${q}`);
