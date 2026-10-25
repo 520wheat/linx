@@ -12,6 +12,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from pozhan.case import load_case
+from pozhan.config import Settings
 from pozhan.director import Director
 from pozhan.director.guard import violation
 from pozhan.engine import Answer, Broke, Confession, Wrong, new_game
@@ -50,8 +51,13 @@ async def show(director, case, state, outcome, label, history):
 
 async def main():
     case = load_case(ROOT / "cases" / "golden-watch.yaml")
-    llm = OpenAICompatLLM(os.environ["LLM_BASE_URL"], os.environ["LLM_API_KEY"], temperature=0.8)
-    director = Director(llm, os.environ.get("SUSPECT_MODEL", "deepseek/deepseek-v4-flash"))
+    llm = OpenAICompatLLM(
+        os.environ["LLM_BASE_URL"],
+        os.environ["LLM_API_KEY"],
+        temperature=0.8,
+        extra_body=Settings.from_env().llm_extra_body,
+    )
+    director = Director(llm, os.environ.get("SUSPECT_MODEL", Settings.suspect_model))
     state = new_game(case, 0)
     flags = 0
 

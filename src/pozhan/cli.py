@@ -29,8 +29,13 @@ def build_app(settings: Settings | None = None):
 
     intent_llm = suspect_llm = None
     if settings.llm_enabled:
-        intent_llm = OpenAICompatLLM(settings.llm_base_url, settings.llm_api_key, temperature=0.0)
-        suspect_llm = OpenAICompatLLM(settings.llm_base_url, settings.llm_api_key, temperature=0.8)
+        extra = settings.llm_extra_body
+        intent_llm = OpenAICompatLLM(
+            settings.llm_base_url, settings.llm_api_key, temperature=0.0, extra_body=extra
+        )
+        suspect_llm = OpenAICompatLLM(
+            settings.llm_base_url, settings.llm_api_key, temperature=0.8, extra_body=extra
+        )
     else:
         log.warning("未配置 LLM_BASE_URL / LLM_API_KEY：只走规则匹配，嫌疑人只会说兜底台词")
     if not settings.api_key:

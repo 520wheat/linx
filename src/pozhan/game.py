@@ -1,17 +1,53 @@
 """一轮对话的编排：意图 → 规则 → 台词。server 只负责协议，业务流程都在这里。"""
 
+import asyncio
+import contextlib
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 
 from pozhan.case.model import Case
-from pozhan.director.director import Director
-from pozhan.engine.events import Command, CommandKind
-from pozhan.engine.outcomes import Briefing, Repeat
+from pozhan.director.director import Director, Line
+from pozhan.engine.events import Ask, Command, CommandKind, Event
+from pozhan.engine.outcomes import Briefing, Outcome, Repeat
 from pozhan.engine.rules import apply, new_game
+from pozhan.engine.state import Interrogation
 from pozhan.gamelog import GameLog
 from pozhan.intent.interpreter import Clarify, Interpreter
-from pozhan.session.store import SessionStore
+from pozhan.session.store import Session, SessionStore
+
+_DONE = object()
+
+
+class _Speculation:
+    """规则没命中时，先假设玩家是在提问，提前开始生成嫌疑人的回答（#22）。
+
+    意图分类和这份回答并行进行：分类结果确实是提问就直接用，否则丢弃。
+    大多数话都是提问，这样能省掉一次分类的等待。
+    """
+
+    def __init__(
+        self, director: Director, case: Case, state: Interrogation, outcome: Outcome, session: Session
+    ):
+        self.state, self.outcome = state, outcome
+        self.queue: asyncio.Queue = asyncio.Queue()
+        self.task = asyncio.create_task(self._produce(director, case, session))
+
+    async def _produce(self, director: Director, case: Case, session: Session) -> None:
+        try:
+            async for line in director.speak(case, self.state, self.outcome, session.history):
+                await self.queue.put(line)
+        finally:
+            await self.queue.put(_DONE)
+
+    async def lines(self) -> AsyncIterator[Line]:
+        while (line := await self.queue.get()) is not _DONE:
+            yield line
+
+    async def cancel(self) -> None:
+        self.task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await self.task
 
 
 class Game:
@@ -37,17 +73,34 @@ class Game:
         async with session.lock:  # 同一局的请求串行处理
             t0 = time.monotonic()
             now = self.clock()
+            spec: _Speculation | None = None
+            event: Event | Clarify
+
             if session.state is None:
                 session.state = new_game(self.case, now)
                 event = Command(CommandKind.START)
+            elif (matched := self.interpreter.match(text, self.case)) is not None:
+                event = matched
             else:
-                event = await self.interpreter.interpret(text, self.case)
+                if not session.state.over:
+                    guess_state, guess = apply(self.case, session.state, Ask(text), now)
+                    spec = _Speculation(self.director, self.case, guess_state, guess, session)
+                event = await self.interpreter.classify(text, self.case)
+                if spec is not None and event != Ask(text):
+                    await spec.cancel()
+                    spec = None
             t_intent = time.monotonic() - t0
 
-            if isinstance(event, Clarify):
-                outcome = event
+            if spec is not None:
+                session.state, outcome = spec.state, spec.outcome
+                lines = spec.lines()
             else:
-                session.state, outcome = apply(self.case, session.state, event, now)
+                if isinstance(event, Clarify):
+                    outcome = event
+                else:
+                    session.state, outcome = apply(self.case, session.state, event, now)
+                lines = self.director.speak(self.case, session.state, outcome, session.history)
+
             if isinstance(outcome, Briefing) and (
                 not session.game_id or event == Command(CommandKind.RESTART)
             ):
@@ -63,7 +116,7 @@ class Game:
             yield emoji
             parts: list[str] = []
             t_first = None
-            async for line in self.director.speak(self.case, session.state, outcome, session.history):
+            async for line in lines:
                 t_first = t_first or time.monotonic() - t0
                 parts.append(line.text)
                 yield line.text
@@ -83,6 +136,7 @@ class Game:
                 strikes=session.state.strikes,
                 broken=session.state.broken,
                 phase=session.state.phase,
+                speculated=spec is not None,
                 intent_s=round(t_intent, 3),
                 first_line_s=round(t_first or 0, 3),
                 total_s=round(time.monotonic() - t0, 3),

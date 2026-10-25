@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 from pozhan.case import load_case
+from pozhan.config import Settings
 from pozhan.engine import Ask, Command, Present
 from pozhan.intent import Clarify, Interpreter, LLMClassifier, RuleMatcher
 from pozhan.llm import OpenAICompatLLM
@@ -50,7 +51,9 @@ class CountingLLM(OpenAICompatLLM):
 async def run(model: str) -> None:
     case = load_case(ROOT / "cases" / "golden-watch.yaml")
     items = yaml.safe_load((ROOT / "evals" / "intent.yaml").read_text(encoding="utf-8"))
-    llm = CountingLLM(os.environ["LLM_BASE_URL"], os.environ["LLM_API_KEY"])
+    llm = CountingLLM(
+        os.environ["LLM_BASE_URL"], os.environ["LLM_API_KEY"], extra_body=Settings.from_env().llm_extra_body
+    )
     it = Interpreter(RuleMatcher(), LLMClassifier(llm, model))
     CountingLLM.calls = 0
 
@@ -74,5 +77,5 @@ async def run(model: str) -> None:
 
 
 if __name__ == "__main__":
-    for m in sys.argv[1:] or [os.environ.get("INTENT_MODEL", "deepseek/deepseek-v4-flash")]:
+    for m in sys.argv[1:] or [os.environ.get("INTENT_MODEL", Settings.intent_model)]:
         asyncio.run(run(m))

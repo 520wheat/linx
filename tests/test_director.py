@@ -68,6 +68,7 @@ def test_guard_blocks_confession_and_breaking_character():
     assert violation("作为一个AI，我不能回答。", may_confess=False) == "out-of-character"
     assert violation("我一直在包厢唱歌。", may_confess=False) is None
     assert violation("好吧，我承认我上过十八楼。", may_confess=False) is None
+    assert violation("是我，拿的。", may_confess=False) == "premature-confession"
 
 
 async def test_briefing_is_deterministic_and_reads_claims_verbatim(case):
@@ -93,8 +94,9 @@ async def test_broke_prompts_the_concession_then_narrates(case):
     x = case.contradiction(2, 1)
     state = new_game(case, 0).__class__(case_id=case.id, started_at=0, stage=1, broken=(1,))
     out = await lines(d, case, state, Broke(x, 1))
-    assert "".join(line.text for line in out[:-1]) == "我……我是上去过，可那是拿奖品！"
-    assert out[-1].speaker == "narrator" and "证词一被戳破" in out[-1].text
+    assert out[0].speaker == "narrator" and out[0].text == "证词一被戳破了！"  # 判定先说，零延迟
+    assert "".join(line.text for line in out[1:-1]) == "我……我是上去过，可那是拿奖品！"
+    assert out[-1].text == "他还在坚持证词二、证词三。"
     task = llm.messages[-1]["content"]
     assert "电梯监控截图" in task and x.concession in task
     assert x.concession in llm.messages[0]["content"]  # 已承认的让步写进人设，保证后续不反悔
@@ -117,6 +119,7 @@ async def test_premature_confession_is_replaced_by_fallback(case):
 async def test_confession_may_confess(case):
     d = Director(llm=ScriptLLM("是我拿的……我欠了钱。"), model="m")
     out = await lines(d, case, new_game(case, 0), Confession(case.contradiction(4, 3)))
+    assert out[0].text == "证词三被戳破了！"
     assert "".join(line.text for line in out if line.speaker == "suspect") == "是我拿的……我欠了钱。"
     assert "案件告破" in out[-1].text
 
@@ -146,8 +149,11 @@ async def test_narrator_only_outcomes(case):
 async def test_wrong_presentation_has_rebuttal_and_countdown(case):
     d = Director(llm=ScriptLLM("我去洗手间了不行吗？"), model="m")
     out = await lines(d, case, new_game(case, 0), Wrong(card=1, claim=1, strikes_left=2))
-    assert out[0].text == "我去洗手间了不行吗？"
-    assert "律师还有二次就到" in out[1].text
+    assert [line.text for line in out] == [
+        "这张卡驳不倒证词一。",
+        "我去洗手间了不行吗？",
+        "律师还有二次就到。",
+    ]
 
 
 def test_suspect_history_window():
