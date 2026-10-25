@@ -14,6 +14,8 @@ from pozhan.llm.client import Message
 from pozhan.session.store import SessionKeyResolver
 
 MODEL_ID = "pozhan"
+MAX_BODY_BYTES = 1_000_000
+MAX_TEXT_CHARS = 200  # 语音识别出来的一句话远小于这个长度；超长输入多半是滥用（#31）
 log = logging.getLogger(__name__)
 
 
@@ -86,14 +88,24 @@ def create_app(
     async def chat(request: Request):
         if not authorized(request):
             return _error(401, "invalid api key")
+        if int(request.headers.get("content-length") or 0) > MAX_BODY_BYTES:
+            return _error(413, "request body too large")
+        raw = await request.body()
+        if len(raw) > MAX_BODY_BYTES:
+            return _error(413, "request body too large")
         try:
-            body = await request.json()
+            body = json.loads(raw)
         except ValueError:
             return _error(400, "body must be JSON")
+        if not isinstance(body, dict):
+            return _error(400, "body must be a JSON object")
         record(request, body)
         messages: list[Message] = body.get("messages") or []
         key = resolver.resolve(request.headers, body)
         text = _last_user_text(messages)
+        if len(text) > MAX_TEXT_CHARS:
+            log.warning("user text truncated from %d chars for %s", len(text), key)
+            text = text[:MAX_TEXT_CHARS]
         cid = "chatcmpl-" + uuid.uuid4().hex[:16]
 
         if not body.get("stream"):
