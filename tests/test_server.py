@@ -177,3 +177,28 @@ async def test_overlong_utterance_is_truncated(tmp_path):
         for x in p.read_text().splitlines()
     ]
     assert len(records[-1]["text"]) == 200
+
+
+@pytest.mark.parametrize(
+    ("raw", "text", "emotion"),
+    [
+        ("开始审讯 [neutral的说]", "开始审讯", "neutral"),
+        ("用二号卡反驳证词一[angry的说]", "用二号卡反驳证词一", "angry"),
+        ("你在哪", "你在哪", None),
+        ("念一下[3]号卡", "念一下[3]号卡", None),
+    ],
+)
+def test_split_asr_emotion_tag(raw, text, emotion):
+    from pozhan.server.app import split_emotion
+
+    assert split_emotion(raw) == (text, emotion)
+
+
+async def test_emotion_tag_does_not_change_the_game(tmp_path):
+    c = Client(make_app(tmp_path))
+    await c.say("开始审讯 [neutral的说]")
+    reply = await c.say("用二号卡反驳证词一 [angry的说]")
+    assert "证词一被戳破了" in reply
+    games = [p for p in tmp_path.rglob("*.jsonl") if p.name != "req.jsonl"]
+    last = json.loads(games[0].read_text().splitlines()[-1])
+    assert last["text"] == "用二号卡反驳证词一" and last["voice_emotion"] == "angry"

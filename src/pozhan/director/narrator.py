@@ -52,7 +52,7 @@ def read_claims(case: Case, state: Interrogation) -> str:
     lines = []
     for c in case.claims:
         mark = "（已被戳破）" if c.id in state.broken else ""
-        lines.append(f"证词{cn(c.id)}{mark}：{c.text}")
+        lines.append(f"证词{cn(c.id)}{mark}：{c.text.rstrip('。！？.!?')}")
     return "。".join(lines) + "。"
 
 

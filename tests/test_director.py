@@ -164,3 +164,8 @@ def test_suspect_history_window():
     ]
     assert len(_recent(history)) == 12 and _recent(history)[-1]["content"] == "29"
     assert Suspect(ScriptLLM(), "m").model == "m"
+
+
+async def test_read_claims_has_no_doubled_punctuation(case):
+    out = await lines(Director(llm=None, model=""), case, new_game(case, 0), ReadClaims())
+    assert "。。" not in out[0].text and out[0].text.count("证词") == 3
