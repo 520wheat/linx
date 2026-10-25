@@ -46,20 +46,31 @@ def _opus():
     return opuslib
 
 
+CONNECT_ATTEMPTS = 3
+
+
 async def _connect_linx(device: LinxDevice):
     import websockets
 
-    return await websockets.connect(
-        device.ws_url,
-        additional_headers={
-            "Authorization": f"Bearer {device.token}",
-            "Protocol-Version": "1",
-            "Device-Id": device.mac,
-            "Client-Id": device.client_id,
-        },
-        max_size=None,
-        ping_interval=None,
-    )
+    # 线上实测（las，Docker 内）偶尔握手超时，重连一次就好：短超时、多试几次，比一次等 10 秒体验好
+    for attempt in range(1, CONNECT_ATTEMPTS + 1):
+        try:
+            return await websockets.connect(
+                device.ws_url,
+                additional_headers={
+                    "Authorization": f"Bearer {device.token}",
+                    "Protocol-Version": "1",
+                    "Device-Id": device.mac,
+                    "Client-Id": device.client_id,
+                },
+                max_size=None,
+                ping_interval=None,
+                open_timeout=5,
+            )
+        except (TimeoutError, OSError) as e:
+            if attempt == CONNECT_ATTEMPTS:
+                raise
+            log.warning("linx connect attempt %d failed: %r, retrying", attempt, e)
 
 
 class VoiceRelay:
