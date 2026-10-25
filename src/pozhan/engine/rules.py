@@ -114,10 +114,21 @@ def _query(case: Case, state: Interrogation, event: Command, now: float) -> Outc
             return Rules()
 
 
+# 说出口的证词都戳破了、还剩问到才说的证词时，再问这么多句还没问到，嫌疑人就自己说漏（#53 自对弈发现：
+# 玩家问不到话题会一直卡住）。推理游戏的通行做法是提示逐级加强，不让玩家彻底卡死
+STUCK_ASKS = 2
+
+
 def _ask(case: Case, state: Interrogation, event: Ask) -> tuple[Interrogation, Outcome]:
-    if event.topic is not None and event.topic in {c.id for c in open_topics(case, state)}:
+    topics = open_topics(case, state)
+    if event.topic is not None and event.topic in {c.id for c in topics}:
         return replace(state, revealed=(*state.revealed, event.topic), idle=0), Revealed(event.topic)
     idle = state.idle + 1
+    all_said_broken = all(c in state.broken for c in state.revealed)
+    if topics and all_said_broken and idle >= STUCK_ASKS:
+        return replace(state, revealed=(*state.revealed, topics[0].id), idle=0), Revealed(
+            topics[0].id, blurted=True
+        )
     stage = case.stages[state.stage]
     if idle >= stage.slip_every:
         slip = next_slip(case, state)

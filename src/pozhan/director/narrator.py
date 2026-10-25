@@ -108,6 +108,11 @@ def still_holding(case: Case, state: Interrogation) -> str:
     return "他说过的证词都被戳破了，可还没松口。看看手里还没用上的卡，围绕它追问。"
 
 
+def blurted(label: int) -> str:
+    """玩家卡住时嫌疑人自己说漏了隐藏证词（#53）。"""
+    return f"他自己说漏了一句。记下了，这是证词{cn(label)}。"
+
+
 def wrong(claim_id: int) -> str:
     return f"这张卡驳不倒证词{cn(claim_id)}。"
 

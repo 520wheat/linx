@@ -30,9 +30,10 @@ class Broke:
 
 @dataclass(frozen=True)
 class Revealed:
-    """侦探问到了隐藏证词的话题，嫌疑人说出这条新证词（#46）。"""
+    """侦探问到了隐藏证词的话题，嫌疑人说出这条新证词（#46）。blurted：玩家卡住了，他自己说漏的（#53）。"""
 
     claim: int
+    blurted: bool = False
 
 
 @dataclass(frozen=True)

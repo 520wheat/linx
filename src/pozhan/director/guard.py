@@ -5,7 +5,7 @@ import re
 # 只拦「认罪」，不拦让步：「我承认我上过楼」是合法的让步。
 # 「是我拿的」要看前面是什么（#53 自对弈发现）：「不是我拿的」是否认，「房卡是我拿的」是对别的东西的让步，
 # 只有单独说、或者说的是被盗物时才算认罪。被盗物由案件的 suspect.stolen 给出
-_CONFESS = re.compile(r"我(?:认罪|坦白)|我偷了")
+_CONFESS = re.compile(r"我(?:认罪|坦白)|我偷了|(?:不该|不应该)(?:拿|偷)")
 _IT_WAS_ME = re.compile(r"是我(拿|偷|干)走?的")
 _FILLER_BEFORE = set("吧啊呀嗯对错了就都")
 _OUT_OF_CHARACTER = re.compile(
@@ -33,6 +33,11 @@ def _confesses(plain: str, stolen: tuple[str, ...]) -> bool:
     if _CONFESS.search(plain):
         return True
     objects = (*stolen, "东西", "它")
+    # 交代赃物下落也是认罪（#53 自对弈：「手镯就藏在我房间」）
+    if any(
+        f"{s}{adv}{verb}在" in plain for s in (*stolen, "它") for adv in ("", "就", "还") for verb in "藏放"
+    ):
+        return True
     if any(
         f"我{verb}了{det}{s}" in plain
         for verb in "拿偷"

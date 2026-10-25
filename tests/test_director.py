@@ -78,6 +78,9 @@ def test_guard_blocks_confession_and_breaking_character():
     assert violation("那手镯是我拿的。", may_confess=False, stolen=("手镯",)) == "premature-confession"
     assert violation("我拿了那只手镯。", may_confess=False, stolen=("手镯",)) == "premature-confession"
     assert violation("东西是我偷的。", may_confess=False) == "premature-confession"
+    assert violation("那手镯我真不该拿。", may_confess=False, stolen=("手镯",)) == "premature-confession"
+    assert violation("手镯就藏在我房间。", may_confess=False, stolen=("手镯",)) == "premature-confession"
+    assert violation("手镯放哪我怎么知道。", may_confess=False, stolen=("手镯",)) is None
 
 
 async def test_briefing_is_deterministic_and_reads_claims_verbatim(case):
