@@ -183,17 +183,22 @@ class Game:
             yield NEUTRAL + narrator.not_heard()
             return
 
-        if session.state is None:
+        matched = self.interpreter.match(text, case)
+        if session.state is None and matched == Command(CommandKind.LIST_CASES):
+            # 还没开局就问有哪些案子：只念列表，不开局（#53）
+            yield NEUTRAL + narrator.case_list(tuple(c.title for c in self.cases), 0)
+            return
+        if matched == Command(CommandKind.NEXT_CASE):
+            # 换下一个案子（#53）：和「重新开始」一样开新局，只是换了案子
+            case = self._next_case(case)
+            session.case_id = case.id
+            session.state = new_game(case, now)
+            event = Command(CommandKind.RESTART)
+        elif session.state is None:
             session.state = new_game(case, now)
             event = Command(CommandKind.START)
-        elif (matched := self.interpreter.match(text, case)) is not None:
+        elif matched is not None:
             event = matched
-            if event == Command(CommandKind.NEXT_CASE):
-                # 换下一个案子（#53）：和「重新开始」一样开新局，只是换了案子
-                case = self._next_case(case)
-                session.case_id = case.id
-                session.state = new_game(case, now)
-                event = Command(CommandKind.RESTART)
         else:
             if not session.state.over:
                 guess_state, guess = apply(case, session.state, Ask(text), now)
