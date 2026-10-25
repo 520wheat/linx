@@ -47,6 +47,15 @@ class Suspect:
 
 
 @dataclass(frozen=True)
+class TimelineStep:
+    """结局页真相时间线的一步：什么时候、发生了什么、对应哪张线索卡。"""
+
+    text: str
+    time: str = ""
+    card: int | None = None
+
+
+@dataclass(frozen=True)
 class Limits:
     strikes: int = 3  # 出示错误几次律师到场
     minutes: int = 15  # 审讯最长时长
@@ -64,6 +73,7 @@ class Case:
     stages: tuple[Stage, ...]
     reveal: str
     limits: Limits = field(default_factory=Limits)
+    timeline: tuple[TimelineStep, ...] = ()  # 可选，陪玩屏结局页使用（#37）
 
     def claim(self, claim_id: int) -> Claim | None:
         return next((c for c in self.claims if c.id == claim_id), None)

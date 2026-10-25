@@ -4,7 +4,7 @@ from typing import Any
 
 import yaml
 
-from pozhan.case.model import Card, Case, Claim, Contradiction, Limits, Stage, Suspect
+from pozhan.case.model import Card, Case, Claim, Contradiction, Limits, Stage, Suspect, TimelineStep
 
 
 def _tidy(text: str) -> str:
@@ -81,6 +81,14 @@ def parse_case(data: dict[str, Any]) -> Case:
             ),
             reveal=_tidy(_require(data, "reveal", "案件")),
             limits=Limits(strikes=int(limits.get("strikes", 3)), minutes=int(limits.get("minutes", 15))),
+            timeline=tuple(
+                TimelineStep(
+                    text=_tidy(_require(t, "text", "timeline")),
+                    time=str(t.get("time") or ""),
+                    card=int(t["card"]) if t.get("card") is not None else None,
+                )
+                for t in (data.get("timeline") or [])
+            ),
         )
     except (TypeError, ValueError) as e:
         if isinstance(e, CaseFormatError):
