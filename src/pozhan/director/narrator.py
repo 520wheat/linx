@@ -199,13 +199,6 @@ def hint(case: Case, state: Interrogation, kind: str, claim: int | None, card: i
     return "现在没什么可提示的，继续审吧。"
 
 
-def case_list(titles: tuple[str, ...], current: int) -> str:
-    items = "；".join(f"{cn(i)}，{t}" for i, t in enumerate(titles, 1))
-    return (
-        f"现在有{count(len(titles))}个案子：{items}。正在审的是第{cn(current + 1)}个。说「下一个案子」就换。"
-    )
-
-
 def not_heard() -> str:
     return "刚才没听清，能再说一遍吗？"
 

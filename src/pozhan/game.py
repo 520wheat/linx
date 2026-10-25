@@ -15,7 +15,6 @@ from pozhan.engine.outcomes import (
     Answer,
     Briefing,
     Broke,
-    CaseList,
     Confession,
     Hint,
     Lawyer,
@@ -101,13 +100,38 @@ class Game:
     def case_of(self, session: Session) -> Case:
         return next((c for c in self.cases if c.id == session.case_id), self.cases[0])
 
+    async def prepare_case(self, key: str, case_id: str) -> Case | None:
+        """网页选关（#67）：只换案子、回到开局画面，不把审讯先在后台开掉。
+
+        真正开口要等玩家点「开始游戏」，走灵矽说「开始审讯」，嫌疑人才进入角色。
+        """
+        chosen = next((c for c in self.cases if c.id == case_id), None)
+        if chosen is None:
+            return None
+        session = self.store.get_or_create(key)
+        async with session.lock:
+            session.case_id = chosen.id
+            session.state = None
+            session.game_id = ""
+            session.history.clear()
+            session.last_reply = ""
+            session.line = None
+            session.event = None
+            session.event_seq = 0
+            session.ended_at = None
+            self.store.put(session)
+            self._publish(session)
+        return chosen
+
     def _next_case(self, case: Case) -> Case:
         i = next(i for i, c in enumerate(self.cases) if c.id == case.id)
         return self.cases[(i + 1) % len(self.cases)]
 
     def _publish(self, session: Session) -> None:
         if self.screen is not None:
-            self.screen.publish(session.key, build_snapshot(self.case_of(session), session, self.clock()))
+            self.screen.publish(
+                session.key, build_snapshot(self.case_of(session), session, self.clock(), self.cases)
+            )
 
     def _mark(self, session: Session, outcome: Outcome | Clarify, prev_stage: int, now: float) -> None:
         """把陪玩屏关心的关键事件记到会话上（#38）。字段只放公开信息。"""
@@ -187,11 +211,17 @@ class Game:
             return
 
         matched = self.interpreter.match(text, case)
-        if session.state is None and matched == Command(CommandKind.LIST_CASES):
-            # 还没开局就问有哪些案子：只念列表，不开局（#53）
-            yield NEUTRAL + narrator.case_list(tuple(c.title for c in self.cases), 0)
-            return
-        if matched == Command(CommandKind.NEXT_CASE):
+        if isinstance(matched, Command) and matched.kind is CommandKind.SELECT_CASE:
+            # 切到指定案子（#67）：和「下一个案子」一样开新局
+            chosen = next((c for c in self.cases if c.id == matched.case_id), None)
+            if chosen is None:
+                yield NEUTRAL + "没有这个案子。"
+                return
+            case = chosen
+            session.case_id = case.id
+            session.state = new_game(case, now)
+            event = Command(CommandKind.RESTART)
+        elif matched == Command(CommandKind.NEXT_CASE):
             # 换下一个案子（#53）：和「重新开始」一样开新局，只是换了案子
             case = self._next_case(case)
             session.case_id = case.id
@@ -226,9 +256,6 @@ class Game:
         else:
             if isinstance(event, Clarify):
                 outcome = event
-            elif event == Command(CommandKind.LIST_CASES):
-                ids = [c.id for c in self.cases]
-                outcome = CaseList(tuple(c.title for c in self.cases), ids.index(case.id))
             else:
                 session.state, outcome = apply(case, session.state, event, now)
             lines = self.director.speak(case, session.state, outcome, session.history)

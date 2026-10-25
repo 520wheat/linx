@@ -202,7 +202,20 @@ body.play #conn { right: auto; left: 14px; }
 #coach:empty { display: none; }
 #coach.nudge { color: var(--accent-ink); animation: nudge .4s; }
 @keyframes nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-#play { position: relative; display: flex; align-items: center; justify-content: center; }
+#play { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; }
+#casesBtn { min-height: 52px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink); font: 700 16px var(--sans); cursor: pointer; }
+#casesBtn[aria-expanded="true"] { background: var(--tint); color: var(--accent-ink); border-color: var(--solid); }
+#cases { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 110px); overflow: auto; z-index: 50; display: flex; flex-direction: column; gap: 8px; padding: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(42, 54, 68, .16); }
+#cases[hidden] { display: none !important; }
+#cases h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; }
+#cases .chip { text-align: left; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--ink); font: 500 15px var(--sans); cursor: pointer; }
+#cases .chip.on { background: var(--tint); color: var(--accent-ink); border-color: var(--solid); }
+#cases .small { margin: 0; color: var(--ink-3); font-size: 14px; line-height: 1.6; }
+body.portrait #cases { left: 16px; right: 16px; width: auto; transform: none; }
 /* 「你：…」回显：浮在提示和状态球上方，不挡住它们 */
 #dock .heard { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); max-width: 100%; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; padding: 8px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line);
@@ -427,11 +440,13 @@ body.play.portrait #desk { display: flex; }
 </div>
 <div id="inspect" hidden aria-live="polite"></div>
 <div id="flash" aria-hidden="true"></div>
+<div id="cases" hidden aria-label="选关"></div>
 <div id="dock">
   <div class="heard" id="heard" role="status"></div>
   <p id="coach" aria-live="polite"></p>
   <form id="askForm" class="ask" hidden><input id="askInput" maxlength="100" autocomplete="off" placeholder="打字问他，比如：你那天晚上去哪了？" aria-label="打字提问"><button type="submit">发送</button></form>
   <div id="play">
+    <button id="casesBtn" type="button" aria-expanded="false" aria-controls="cases">选关</button>
     <button id="talk" type="button" data-state="off">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
       <span id="talkText">开始游戏</span>
@@ -483,6 +498,18 @@ body.play.portrait #desk { display: flex; }
   fit();
 
   let snap = null;
+  let casesList = /*BOOT_LIBRARY*/null;
+  if (!Array.isArray(casesList)) casesList = [];
+  const screenBase = () => {
+    const path = location.pathname;
+    const i = path.lastIndexOf("/screen");
+    return i >= 0 ? path.slice(0, i + 7) + "/" : "/screen/";
+  };
+  const screenQuery = () => {
+    const q = new URLSearchParams();
+    for (const k of ["token", "device"]) if (params.get(k)) q.set(k, params.get(k));
+    return q;
+  };
   let clockOffset = 0;          // 服务端时间 - 本地时间（秒）
   let lastEventId = null;       // 已经展示过的事件，刷新页面不重放
   let momentUntil = 0;          // 「戳破瞬间」显示到什么时候
@@ -892,11 +919,63 @@ body.play.portrait #desk { display: flex; }
     if (kind === "bad") kick($("pips"), "hit");
   }
 
+  function caseLibrary() {
+    const fromSnap = snap && Array.isArray(snap.library) ? snap.library : [];
+    if (fromSnap.length) return fromSnap;
+    return casesList;
+  }
+
+  async function pickCase(id) {
+    const box = $("cases");
+    const cur = snap && snap.case && snap.case.id;
+    if (id === cur) {
+      box.hidden = true;
+      $("casesBtn").setAttribute("aria-expanded", "false");
+      return;
+    }
+    try {
+      const r = await fetch(`${screenBase()}select?${screenQuery()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      apply(await r.json());
+      box.hidden = true;
+      $("casesBtn").setAttribute("aria-expanded", "false");
+      if (sendText) sendText("开始审讯");
+    } catch {
+      const note = box.querySelector("p.small") || el("p", "small");
+      note.textContent = "切换失败，请再点一次。";
+      if (!note.parentNode) box.append(note);
+    }
+  }
+
+  function renderCases() {
+    const box = $("cases");
+    if (!box) return;
+    const lib = caseLibrary();
+    const cur = snap && snap.case && snap.case.id;
+    const head = el("h3", null, "选择关卡");
+    const nodes = lib.length
+      ? lib.map((item) => {
+          const b = el("button", "chip" + (item.id === cur ? " on" : ""), item.title);
+          b.type = "button";
+          b.addEventListener("click", () => { pickCase(item.id); });
+          return b;
+        })
+      : [el("p", "small", "案子还没加载出来，过一秒再点选关。")];
+    box.replaceChildren(head, ...nodes);
+  }
+
   function apply(next) {
     const first = snap === null;
+    if (snap && snap.library && !next.library) next = { ...next, library: snap.library };
     snap = next;
+    if (Array.isArray(snap.library) && snap.library.length) casesList = snap.library;
     clockOffset = snap.serverNow - Date.now() / 1000;
     renderCommon();
+    renderCases();
     if (snap.claims) renderInterrogation();
     if (snap.result) renderEnded();
     const key = snap.claims ? `${snap.claims.length}/${snap.claims.filter((c) => c.status === "broken").length}` : "";
@@ -978,10 +1057,9 @@ body.play.portrait #desk { display: flex; }
   }
 
   async function connect() {
-    const q = new URLSearchParams();
-    for (const k of ["token", "device"]) if (params.get(k)) q.set(k, params.get(k));
+    const q = screenQuery();
     // 相对页面路径计算接口地址：挂在反向代理的子路径下也能用
-    const base = location.pathname.replace(/\/?$/, "/");
+    const base = screenBase();
     let lostTimer = 0;
     const ok = () => { clearTimeout(lostTimer); lostTimer = 0; $("conn").classList.remove("show"); };
     // 断开超过 2 秒才提示，避免网络抖动时闪烁
@@ -990,6 +1068,7 @@ body.play.portrait #desk { display: flex; }
     try {
       const r = await fetch(`${base}state?${q}`, { cache: "no-store" });
       if (r.status === 401) { denied(); return; }
+      if (r.ok) apply(await r.json());
     } catch {}
 
     let gotAny = false;
@@ -1312,7 +1391,24 @@ body.play.portrait #desk { display: flex; }
     if (snap) { onSnap(); renderDesk(); renderTargets(); }
   }
 
+  async function refreshCases() {
+    try {
+      const r = await fetch(`${screenBase()}state?${screenQuery()}`, { cache: "no-store" });
+      if (r.ok) apply(await r.json());
+    } catch {}
+  }
+  async function toggleCases() {
+    const box = $("cases");
+    const open = box.hidden;
+    if (open && !caseLibrary().length) await refreshCases();
+    renderCases();
+    box.hidden = !open;
+    $("casesBtn").setAttribute("aria-expanded", String(open));
+  }
+  $("casesBtn").addEventListener("click", toggleCases);
+
   show("briefing");
+  renderCases();
   if (params.get("play") === "1") {
     const base = location.pathname.replace(/\/?$/, "/");
     const q = new URLSearchParams();

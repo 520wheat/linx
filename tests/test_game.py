@@ -133,7 +133,7 @@ async def test_presentations_get_no_filler(case):
     assert reply.startswith("😠证词一被戳破了！")
 
 
-async def test_next_case_switches_and_lists_cases(case):
+async def test_next_case_switches_and_selects_a_case(case):
     from dataclasses import replace
 
     from pozhan.engine import CommandKind
@@ -148,11 +148,11 @@ async def test_next_case_switches_and_lists_cases(case):
         store=MemoryStore(),
     )
     assert match("换个案子", case).kind is CommandKind.NEXT_CASE
-    assert match("有哪些案子", case).kind is CommandKind.LIST_CASES
+    picked = match("切换到案子 other", case)
+    assert picked.kind is CommandKind.SELECT_CASE and picked.case_id == "other"
+    assert match("有哪些案子", case) is None
     await say(game, "开始审讯")
     assert game.case_of(game.store.get("k")).id == case.id
-    listing, _ = await say(game, "有哪些案子")
-    assert "一，年会夜的金表；二，另一个案子" in listing and "第一个" in listing
     await say(game, "用2号卡反驳证词1")
     reply, _ = await say(game, "下一个案子")
     session = game.store.get("k")
@@ -161,9 +161,13 @@ async def test_next_case_switches_and_lists_cases(case):
     assert game.case_of(session).id == "other"  # 重新开始重玩当前这个
     await say(game, "下一个案子")
     assert game.case_of(session).id == case.id  # 最后一个之后回到第一个
+    reply, _ = await say(game, "切换到案子 other")
+    assert game.store.get("k").case_id == "other" and game.store.get("k").state.broken == ()
+    missing, _ = await say(game, "切换到案子 no-such")
+    assert "没有这个案子" in missing
 
 
-async def test_listing_cases_before_starting_does_not_start_a_game(case):
+async def test_select_case_before_starting_opens_that_case(case):
     from dataclasses import replace
 
     other = replace(case, id="other", title="另一个案子")
@@ -174,7 +178,27 @@ async def test_listing_cases_before_starting_does_not_start_a_game(case):
         director=Director(None, ""),
         store=MemoryStore(),
     )
-    listing, _ = await say(game, "有哪些案子")
-    assert "两个案子" in listing and game.store.get("k").state is None
-    reply, _ = await say(game, "换个案子")  # 第一句就换：直接开第二个
+    reply, _ = await say(game, "切换到案子 other")
     assert game.store.get("k").case_id == "other" and reply.startswith("😌")
+
+
+async def test_prepare_case_waits_for_start(case):
+    from dataclasses import replace
+
+    other = replace(case, id="other", title="另一个案子")
+    game = Game(
+        case=case,
+        cases=(case, other),
+        interpreter=Interpreter(RuleMatcher(), None),
+        director=Director(None, ""),
+        store=MemoryStore(),
+    )
+    await say(game, "开始审讯")
+    chosen = await game.prepare_case("k", "other")
+    assert chosen.id == "other"
+    session = game.store.get("k")
+    assert session.case_id == "other" and session.state is None
+    reply, _ = await say(game, "开始审讯")
+    session = game.store.get("k")
+    assert session.case_id == "other" and session.state is not None
+    assert other.briefing[:10] in reply

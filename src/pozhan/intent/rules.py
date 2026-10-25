@@ -44,9 +44,10 @@ def _strip_card(text: str) -> tuple[int | None, str]:
     return card, text[: span[0]] + " " + text[span[1] :]
 
 
+_SELECT = re.compile(r"(?:切换到|换到)(?:案子|关卡)\s*([a-z0-9-]+)")
+
 _COMMANDS: list[tuple[CommandKind, re.Pattern[str]]] = [
     (CommandKind.NEXT_CASE, re.compile(r"(?:下一个|下个|换个|换一个|新的?|别的)案子|换(?:个|一个)案件")),
-    (CommandKind.LIST_CASES, re.compile(r"(?:有|还有)(?:哪些|什么|几个)案子|案子(?:列表|有哪些)")),
     (CommandKind.RESTART, re.compile(r"重新开始|再来一局|重开一局|再玩一局|再审一次|再试一次")),
     (
         CommandKind.HINT,
@@ -70,6 +71,9 @@ _READ = re.compile(r"念|读一下|读读|再听|是什么|有哪些|写的什�
 def match(text: str, case: Case) -> Event | None:
     """规则匹配；无法确定时返回 None，交给大模型。"""
     t = text.strip().rstrip("。！？!?.，, ")
+
+    if m := _SELECT.search(t):
+        return Command(CommandKind.SELECT_CASE, case_id=m.group(1))
 
     for kind, pattern in _COMMANDS:
         if pattern.search(t):
