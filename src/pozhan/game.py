@@ -100,6 +100,29 @@ class Game:
     def case_of(self, session: Session) -> Case:
         return next((c for c in self.cases if c.id == session.case_id), self.cases[0])
 
+    async def prepare_case(self, key: str, case_id: str) -> Case | None:
+        """网页选关（#67）：只换案子、回到开局画面，不把审讯先在后台开掉。
+
+        真正开口要等玩家点「开始游戏」，走灵矽说「开始审讯」，嫌疑人才进入角色。
+        """
+        chosen = next((c for c in self.cases if c.id == case_id), None)
+        if chosen is None:
+            return None
+        session = self.store.get_or_create(key)
+        async with session.lock:
+            session.case_id = chosen.id
+            session.state = None
+            session.game_id = ""
+            session.history.clear()
+            session.last_reply = ""
+            session.line = None
+            session.event = None
+            session.event_seq = 0
+            session.ended_at = None
+            self.store.put(session)
+            self._publish(session)
+        return chosen
+
     def _next_case(self, case: Case) -> Case:
         i = next(i for i, c in enumerate(self.cases) if c.id == case.id)
         return self.cases[(i + 1) % len(self.cases)]

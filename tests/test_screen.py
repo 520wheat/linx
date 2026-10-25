@@ -277,12 +277,16 @@ async def test_select_endpoint_switches_case(client_for):
     assert (await http.post("/screen/select", json={"id": "other"})).status_code == 401
     idle = (await http.get("/screen/state?token=t0k")).json()
     assert idle["case"]["id"] == "golden-watch"
-    r = await http.post("/screen/select?token=t0k", json={"id": "other"})
+    r = await http.post("/screen/select?token=t0k&device=dev-1", json={"id": "other"})
     assert r.status_code == 200
     body = r.json()
     assert body["case"]["id"] == "other" and body["case"]["title"] == "另一个案子"
+    assert body["scene"] == "briefing"
     assert [c["id"] for c in body["library"]] == ["golden-watch", "other"]
-    assert (await http.get("/screen/state?token=t0k")).json()["case"]["id"] == "other"
+    assert (await http.get("/screen/state?token=t0k&device=dev-1")).json()["scene"] == "briefing"
+    await say(http, "开始审讯", device="dev-1")
+    started = (await http.get("/screen/state?token=t0k&device=dev-1")).json()
+    assert started["case"]["id"] == "other" and started["scene"] == "interrogating"
     missing = await http.post("/screen/select?token=t0k", json={"id": "nope"})
     assert missing.status_code == 404
 

@@ -180,3 +180,25 @@ async def test_select_case_before_starting_opens_that_case(case):
     )
     reply, _ = await say(game, "切换到案子 other")
     assert game.store.get("k").case_id == "other" and reply.startswith("😌")
+
+async def test_prepare_case_waits_for_start(case):
+    from dataclasses import replace
+
+    other = replace(case, id="other", title="另一个案子")
+    game = Game(
+        case=case,
+        cases=(case, other),
+        interpreter=Interpreter(RuleMatcher(), None),
+        director=Director(None, ""),
+        store=MemoryStore(),
+    )
+    await say(game, "开始审讯")
+    chosen = await game.prepare_case("k", "other")
+    assert chosen.id == "other"
+    session = game.store.get("k")
+    assert session.case_id == "other" and session.state is None
+    reply, _ = await say(game, "开始审讯")
+    session = game.store.get("k")
+    assert session.case_id == "other" and session.state is not None
+    assert other.briefing[:10] in reply
+

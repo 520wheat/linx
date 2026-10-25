@@ -190,8 +190,9 @@ def create_app(
         if not any(c.id == case_id for c in game.cases):
             return _error(404, "unknown case")
         key = play_key(request)
-        async for _ in game.turn(key, f"切换到案子 {case_id}"):
-            pass
+        chosen = await game.prepare_case(key, case_id)
+        if chosen is None:
+            return _error(404, "unknown case")
         return current_snapshot(request.query_params.get("device"))
 
     @app.get("/screen/events")
