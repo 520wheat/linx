@@ -13,6 +13,7 @@ class Settings:
     intent_model: str = "deepseek/deepseek-v4-flash"
     suspect_model: str = "deepseek/deepseek-v4-flash"
     log_dir: str = "logs"
+    log_requests: bool = False  # 记录平台发来的原始请求，用于核对请求格式
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -25,6 +26,7 @@ class Settings:
             intent_model=env.get("INTENT_MODEL", cls.intent_model),
             suspect_model=env.get("SUSPECT_MODEL", cls.suspect_model),
             log_dir=env.get("POZHAN_LOG_DIR", cls.log_dir),
+            log_requests=env.get("POZHAN_LOG_REQUESTS", "") in ("1", "true", "yes"),
         )
 
     @property
